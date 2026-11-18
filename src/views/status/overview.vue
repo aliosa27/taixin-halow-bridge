@@ -1,0 +1,209 @@
+<script setup lang="ts">
+  import { ref, computed, reactive, onBeforeMount, onUnmounted } from 'vue';
+  import { useI18n } from 'vue-i18n';
+  import { getSettings, connStat, RET, type connStatClass } from '@/wnbCom';
+  import { WIFI_MODE, KEY_MGMT, SELECT, wifiModeKey } from '@/utils';
+  import { useDashboardStore } from '@/store';
+  import { logoutIn3s } from '@/router';
+  import msgPopupVue from '@/components/msgPopup.vue';
+  import { Icon } from '@vicons/utils';
+  import {
+    RouterOutlined,
+    SettingsEthernetOutlined,
+    WifiOutlined,
+    MemoryOutlined
+  } from '@vicons/material';
+
+  const { t } = useI18n({
+    inheritLocale: true,
+    useScope: 'local'
+  });
+  const { t: tg } = useI18n({
+    useScope: 'global'
+  });
+
+  const pollData = ['s_ipaddr', 's_netmask', 's_gw_ip', 'uptime', 'fwver', 'mac_addr',
+    'heap_free', 'heap_total', 'skb_free', 'skb_total',
+    'dhcpc_en', 'wifi_mode', 'wifi_wnb', 'wifi_ssid', 'wifi_r_ssid', 'wifi_keymgmt'] as const;
+
+  type poll = {
+    [key in typeof pollData[number]]: string
+  }
+  const dashboardStore = useDashboardStore();
+
+  const statusPoll = reactive({} as poll);
+  const connStatDisplay = reactive({} as connStatClass);
+
+  const popAuthFail = ref<boolean>(false);
+  const popLoadFail = ref<boolean>(false);
+
+  async function getPollData() {
+    const resp = await getSettings(pollData, dashboardStore.authToken);
+    if (resp.state === RET.OK) {
+      Object.assign(statusPoll, resp.settings);
+    } else if (resp.state === RET.AUTH_FAIL) {
+      popAuthFail.value = true;
+      logoutIn3s();
+    } else {
+      popLoadFail.value = true;
+    }
+  }
+
+  async function pollConnState() {
+    const resp = await connStat(dashboardStore.authToken);
+    if (resp.state === RET.OK) {
+      Object.assign(connStatDisplay, resp.connStat);
+    } else if (resp.state === RET.AUTH_FAIL) {
+      popAuthFail.value = true;
+      logoutIn3s();
+    } else {
+      popLoadFail.value = true;
+    }
+  }
+
+  onBeforeMount(async () => {
+    await getPollData();
+    await pollConnState();
+  });
+
+  const interval = setInterval(async () => {
+    await getPollData();
+    await pollConnState();
+  }, 10000);
+
+  onUnmounted(() => {
+    clearInterval(interval);
+  });
+
+  const ipMode = computed(() => {
+    if (statusPoll.dhcpc_en === SELECT.ENABLE || statusPoll.wifi_mode === WIFI_MODE.APSTA)
+      return t('ipDHCP');
+    else
+      return t('ipStatic');
+  });
+
+  const wifiOpmode = computed(() => {
+    const key = wifiModeKey(statusPoll.wifi_mode, statusPoll.wifi_wnb);
+    return key ? tg(key) : '';
+  });
+
+  // AP side: "connected" means at least one station is associated
+  const connLabel = computed(() => {
+    if (statusPoll.wifi_mode === WIFI_MODE.AP)
+      return connStatDisplay.connected ? t('hasClients') : t('noClients');
+    return connStatDisplay.connected ? t('connected') : t('disconnected');
+  });
+
+  const showSignal = computed(() => connStatDisplay.connected && statusPoll.wifi_mode !== WIFI_MODE.AP);
+
+  // Memory: free bytes of total, for the Memory card
+  function kb(v: string): string {
+    return (parseInt(v) / 1024).toFixed(1) + ' KB';
+  }
+  function pct(free: string, total: string): number {
+    const f = parseInt(free), tot = parseInt(total);
+    return tot > 0 ? Math.round(100 * (tot - f) / tot) : 0;
+  }
+  const showMem = computed(() => !!statusPoll.heap_total && statusPoll.heap_total !== '0');
+
+  const signalStrength = computed(() => {
+    return Math.min(Math.max(2 * (connStatDisplay.rssi + 100), 0), 100);
+  });
+
+</script>
+
+<template>
+  <div class="cards">
+    <section class="card">
+      <h3><Icon><WifiOutlined /></Icon>{{t('WiFiInfo')}}</h3>
+      <dl class="kv">
+        <dt>{{t('opMode')}}</dt><dd>{{wifiOpmode}}</dd>
+        <dt>{{t('state')}}</dt><dd><span class="chip" :class="{ ok: connStatDisplay.connected }">{{connLabel}}</span></dd>
+        <dt>SSID</dt><dd>{{statusPoll.wifi_ssid}}</dd>
+        <template v-if="statusPoll.wifi_mode === WIFI_MODE.APSTA">
+          <dt>{{t('rssid')}}</dt><dd>{{statusPoll.wifi_r_ssid}}</dd>
+        </template>
+        <dt>{{t('keymgmt')}}</dt><dd>{{statusPoll.wifi_keymgmt === KEY_MGMT.PSK ? 'WPA-PSK' : t('open')}}</dd>
+        <template v-if="connStatDisplay.channel">
+          <dt>{{t('channel')}}</dt><dd>{{connStatDisplay.channel}}</dd>
+        </template>
+        <template v-if="showSignal">
+          <dt>{{t('signal')}}</dt>
+          <dd><progress :value="signalStrength" max="100"></progress> {{connStatDisplay.rssi}} dBm</dd>
+        </template>
+      </dl>
+    </section>
+    <section class="card">
+      <h3><Icon><SettingsEthernetOutlined /></Icon>{{t('LAN')}}</h3>
+      <dl class="kv">
+        <dt>{{t('ipMode')}}</dt><dd>{{ipMode}}</dd>
+        <dt>{{t('ipAddr')}}</dt><dd>{{statusPoll.s_ipaddr}}</dd>
+        <dt>{{t('netmask')}}</dt><dd>{{statusPoll.s_netmask}}</dd>
+        <dt>{{t('gwIP')}}</dt><dd>{{statusPoll.s_gw_ip}}</dd>
+      </dl>
+    </section>
+    <section class="card">
+      <h3><Icon><RouterOutlined /></Icon>{{t('deviceInfo')}}</h3>
+      <dl class="kv">
+        <dt>{{t('fwVer')}}</dt><dd>{{statusPoll.fwver}}</dd>
+        <dt>{{t('uptime')}}</dt><dd>{{statusPoll.uptime}}</dd>
+        <dt>{{t('macAddr')}}</dt><dd>{{statusPoll.mac_addr}}</dd>
+      </dl>
+    </section>
+    <section class="card" v-if="showMem">
+      <h3><Icon><MemoryOutlined /></Icon>{{t('memory')}}</h3>
+      <dl class="kv">
+        <dt>{{t('heap')}}</dt>
+        <dd>{{kb(statusPoll.heap_free)}} {{t('freeOf')}} {{kb(statusPoll.heap_total)}}</dd>
+        <dd class="bar"><progress :value="pct(statusPoll.heap_free, statusPoll.heap_total)" max="100"></progress></dd>
+        <dt>{{t('skb')}}</dt>
+        <dd>{{kb(statusPoll.skb_free)}} {{t('freeOf')}} {{kb(statusPoll.skb_total)}}</dd>
+        <dd class="bar"><progress :value="pct(statusPoll.skb_free, statusPoll.skb_total)" max="100"></progress></dd>
+      </dl>
+      <p class="hint">{{t('memHint')}}</p>
+    </section>
+  </div>
+  <msgPopupVue v-model:pop="popAuthFail" mode="Logout">{{tg('authTMout')}}</msgPopupVue>
+  <msgPopupVue v-model:pop="popLoadFail" mode="Alert">{{tg('pageLoadErr')}}</msgPopupVue>
+</template>
+
+<i18n lang="json">
+  {
+    "enUS": {
+      "deviceInfo": "Device",
+      "fwVer": "Firmware",
+      "uptime": "Uptime",
+      "macAddr": "MAC address",
+      "LAN": "Network",
+      "ipMode": "IP mode",
+      "ipAddr": "IP address",
+      "netmask": "Netmask",
+      "gwIP": "Gateway",
+      "WiFiInfo": "Wireless",
+      "opMode": "Mode",
+      "state": "Link",
+      "rssid": "Repeater SSID",
+      "keymgmt": "Security",
+      "open": "Open",
+      "channel": "Channel",
+      "ipStatic": "Static",
+      "ipDHCP": "DHCP",
+      "connected": "Connected",
+      "disconnected": "Not connected",
+      "hasClients": "Stations connected",
+      "noClients": "No stations",
+      "signal": "Signal",
+      "memory": "Memory",
+      "heap": "System heap",
+      "skb": "Packet buffers",
+      "freeOf": "free of",
+      "memHint": "Bars show the share in use. Refreshes every 10 s."
+    }
+  }
+</i18n>
+
+<style scoped>
+  .kv .bar { grid-column: 1 / -1; text-align: left; margin-top: -.2rem; }
+  .kv .bar progress { max-width: none; }
+  .hint { margin: .8rem 0 0; font-size: .82em; color: var(--muted); }
+</style>

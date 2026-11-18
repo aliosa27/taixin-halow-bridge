@@ -1,0 +1,35 @@
+{
+  "compilerOptions": {
+    "target": "ES2015",
+    "useDefineForClassFields": true,
+    "module": "ESNext",
+    "lib": ["ES2015", "DOM", "DOM.Iterable"],
+    "skipLibCheck": true,
+
+    /* Bundler mode */
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "jsx": "preserve",
+
+    /* Linting */
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+
+    "types": ["node"],
+
+    "paths": {
+      "@/*": ["./src/*"],
+      "vue-i18n": ["./src/lite/i18n.ts"],
+      "vue-router": ["./src/lite/router.ts"],
+      "@vicons/utils": ["./src/lite/icon.ts"]
+    }
+  },
+  "include": ["src/**/*.ts", "src/**/*.d.ts", "src/**/*.tsx", "src/**/*.vue"],
+  "exclude": ["src/views/setupHelper/*.vue", "src/views/status/*NotInUse.vue"],
+  "references": [{ "path": "./tsconfig.node.json" }]
+}
