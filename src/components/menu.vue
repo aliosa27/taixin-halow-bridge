@@ -15,7 +15,6 @@
     TuneOutlined,
     SettingsApplicationsOutlined,
     UpgradeOutlined,
-    BugReportOutlined,
     LogOutOutlined
   } from '@vicons/material';
 
@@ -90,12 +89,6 @@
             {{t('DeviceUpgrade')}}
           </RouterLink>
         </li>
-        <li class="menu-item">
-          <RouterLink class="menu-link" :to="{ name: 'Debug' }">
-            <Icon><BugReportOutlined /></Icon>
-            {{t('Debug')}}
-          </RouterLink>
-        </li>
         <li class="menu-item menu-foot" v-if="!dashboardStore.deviceConfig.noWebAuth">
           <button type="button" @click="popConfirmLogout = true">
             <Icon><LogOutOutlined /></Icon>
@@ -120,7 +113,6 @@
       "WiFiAdvanced": "Radio",
       "DeviceManagement": "Management",
       "DeviceUpgrade": "Firmware",
-      "Debug": "Debug",
       "Logout": "Log out",
       "confirmLogout": "Log out of the device?"
     }

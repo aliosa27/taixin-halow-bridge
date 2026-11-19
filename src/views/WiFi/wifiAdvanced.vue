@@ -54,22 +54,6 @@
   // frequencies in 100 kHz units ("8640,8660"); channel N = Nth entry.
   const chFreqs = computed(() => (settingReactive.value.wifi_chan_list || '')
     .split(',').filter((f) => f !== ''));
-  // Editable frequency list, shown in MHz ("864.0, 866.0"), sent as 100 kHz units (AT+CHAN_LIST)
-  const freqText = ref<string>('');
-  const freqErr = ref<string>('');
-  watch(() => settingReactive.value.wifi_chan_list, (v) => {
-    freqText.value = (v || '').split(',').filter((f) => f !== '').map((f) => (parseInt(f) / 10).toFixed(1)).join(', ');
-  }, { immediate: true });
-  function freqChanged() {
-    const parts = freqText.value.split(/[\s,;]+/).filter((f) => f !== '');
-    const vals = parts.map((p) => Math.round(parseFloat(p) * 10));
-    if (parts.length === 0 || parts.length > 16 || vals.some((v, i) => !/^\d{3}(\.\d)?$/.test(parts[i]) || v < 7000 || v > 9500)) {
-      freqErr.value = t('freqInvalid');
-      return;
-    }
-    freqErr.value = '';
-    settingReactive.value.wifi_chan_list = vals.join(',');
-  }
   const chListRender = computed(() => chFreqs.value.map((_, idx) => (idx + 1).toString()));
   function genChannelList(item: string) {
     const freq = parseInt(chFreqs.value[parseInt(item) - 1]) / 10;
@@ -134,7 +118,6 @@
         errs++
         break
     }
-    if (freqErr.value) errs++;
     inputOK.value = errs === 0;
   });
 
@@ -148,12 +131,6 @@
     <form>
       <fieldset>
         <legend>{{t('header')}}</legend>
-        <div class="ctrl-group">
-          <label for="freqlist">{{t('freqList')}}</label>
-          <input type="text" id="freqlist" class="wide" v-model.lazy="freqText" @change="freqChanged" />
-          <span class="msg-warn">{{freqErr}}</span>
-          <span class="msg-help">{{t('freqHelp')}}</span>
-        </div>
         <div class="ctrl-group">
           <label for="channel">{{t('channel')}}</label>
           <select id="channel" v-model="settingReactive.wifi_chan">
@@ -203,9 +180,6 @@
   {
     "enUS": {
       "header": "Radio settings",
-      "freqList": "Frequencies (MHz)",
-      "freqHelp": "Centre frequencies, comma separated, up to 16 (AT+CHAN_LIST). An access point runs on the channel picked below. A station scans only these frequencies when looking for its access point, so include the AP's frequency.",
-      "freqInvalid": "Enter 1 to 16 frequencies in MHz, e.g. 864.0, 866.0",
       "channel": "Channel",
       "txMCS": "Tx MCS",
       "bssbw": "Bandwidth",
