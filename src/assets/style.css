@@ -301,7 +301,7 @@ fieldset fieldset {
 .card h3 .xicon { color: var(--primary); font-size: 1.25em; }
 .kv { display: grid; grid-template-columns: auto 1fr; gap: .45rem 1rem; margin: 0; }
 .kv dt { color: var(--muted); }
-.kv dd { margin: 0; text-align: right; font-weight: 500; overflow-wrap: anywhere; }
+.kv dd { margin: 0; text-align: right; font-weight: 500; overflow-wrap: break-word; }
 .chip {
     display: inline-flex;
     align-items: center;
