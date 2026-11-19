@@ -22,7 +22,7 @@
     useScope: 'global'
   });
 
-  const pollData = ['s_ipaddr', 's_netmask', 's_gw_ip', 'uptime', 'fwver', 'mac_addr',
+  const pollData = ['s_ipaddr', 's_netmask', 's_gw_ip', 'uptime', 'fwver', 'buildtime', 'mac_addr',
     'heap_free', 'heap_total', 'skb_free', 'skb_total',
     'dhcpc_en', 'wifi_mode', 'wifi_wnb', 'wifi_ssid', 'wifi_r_ssid', 'wifi_keymgmt'] as const;
 
@@ -32,6 +32,14 @@
   const dashboardStore = useDashboardStore();
 
   const statusPoll = reactive({} as poll);
+
+  // Firmware build time comes as C's __DATE__ __TIME__: "Nov 18 2026 18:05:12" -> "2026-11-18 18:05"
+  const builtAt = computed(() => {
+    const m = /^(\w{3}) +(\d+) (\d{4}) (\d\d:\d\d)/.exec(statusPoll.buildtime || '');
+    if (!m) return statusPoll.buildtime || '';
+    const mon = 'JanFebMarAprMayJunJulAugSepOctNovDec'.indexOf(m[1]) / 3 + 1;
+    return m[3] + '-' + String(mon).padStart(2, '0') + '-' + m[2].padStart(2, '0') + ' ' + m[4];
+  });
   const connStatDisplay = reactive({} as connStatClass);
 
   const popAuthFail = ref<boolean>(false);
@@ -146,6 +154,7 @@
       <h3><Icon><RouterOutlined /></Icon>{{t('deviceInfo')}}</h3>
       <dl class="kv">
         <dt>{{t('fwVer')}}</dt><dd>{{statusPoll.fwver}}</dd>
+        <template v-if="builtAt"><dt>{{t('built')}}</dt><dd>{{builtAt}}</dd></template>
         <dt>{{t('uptime')}}</dt><dd>{{statusPoll.uptime}}</dd>
         <dt>{{t('macAddr')}}</dt><dd>{{statusPoll.mac_addr}}</dd>
       </dl>
@@ -172,6 +181,7 @@
     "enUS": {
       "deviceInfo": "Device",
       "fwVer": "Firmware",
+      "built": "Built",
       "uptime": "Uptime",
       "macAddr": "MAC address",
       "LAN": "Network",
