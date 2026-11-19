@@ -225,6 +225,7 @@ fieldset fieldset {
     align-items: center;
     gap: .7rem;
     width: 100%;
+    box-sizing: border-box;
     padding: .6rem .7rem;
     border-radius: 8px;
     color: var(--side-text);

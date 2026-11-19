@@ -5,3 +5,4 @@ export { getSettings, loadPageData, applySettings } from "./settings";
 export { deviceConfig, connStat, stationList, fetchScanList, dhcpLeaseList, clientList } from "./deviceStatus";
 export { reboot, loadDef } from "./deviceActions";
 export { firmwareUpgrade } from "./firmware";
+export { atCommand } from "./debug";
