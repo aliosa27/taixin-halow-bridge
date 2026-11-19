@@ -37,7 +37,7 @@
   });
 
   const toRestartWiFiList =
-  ['wifi_mode', 'wifi_wnb', 'wifi_keymgmt', 'wifi_ssid', 'wifi_passwd', 'wifi_r_ssid', 'wifi_r_keymgmt', 'wifi_r_passwd', 'wifi_bssbw', 'wifi_chan'];
+  ['wifi_mode', 'wifi_wnb', 'wifi_keymgmt', 'wifi_ssid', 'wifi_passwd', 'wifi_r_ssid', 'wifi_r_keymgmt', 'wifi_r_passwd', 'wifi_bssbw', 'wifi_chan', 'wifi_chan_list'];
   const toConfirmApplyValue = 'web_passwd';
 
   const dashboardStore = useDashboardStore();

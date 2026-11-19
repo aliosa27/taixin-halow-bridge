@@ -404,3 +404,4 @@ progress::-moz-progress-bar { background: var(--primary); border-radius: 8px; }
 .xicon { width: 1em; height: 1em; display: inline-flex; flex: none; }
 .xicon svg { width: 1em; height: 1em; }
 .xicon svg:not([fill]) { fill: currentColor; }
+input.wide { width: 24rem; max-width: 100%; }
