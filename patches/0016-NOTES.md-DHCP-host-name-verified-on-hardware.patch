@@ -1,0 +1,22 @@
+From 6b946bad9a95c70719cbc614a2d5a86a56faf49c Mon Sep 17 00:00:00 2001
+From: aliosa27 <aliosa27@aliosa27.me>
+Date: Fri, 20 Nov 2026 10:46:08 -0800
+Subject: [PATCH 16/16] NOTES.md: DHCP host name verified on hardware
+
+---
+ NOTES.md | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/NOTES.md b/NOTES.md
+index 82229e5..f331f2c 100644
+--- a/NOTES.md
++++ b/NOTES.md
+@@ -35,7 +35,7 @@ Taixin TXW8301 (TXW4002A, C-SKY CK803) HaLow wireless-bridge (WNB) firmware SDK
+   - `POST /fwupg.data`: streams the image into `libota_write_fw_ah()`, the same call sequence as `AT+FWUPG`
+ - Writes are staged, validated, committed, and applied after the response is sent (`webui_run_todo`). To add a setting, add it to `webui_get_value()` and `webui_set_value()`. Read-only status keys: `fwver`, `buildtime` (`__DATE__ __TIME__` of `webui.c`, which `prebuild.sh` forces to recompile on every build), `uptime`, `s_ipaddr`/`s_netmask`/`s_gw_ip` (live w0), `heap_free`/`heap_total` (`sram_heap`), `skb_free`/`skb_total` (WiFi packet-buffer pool), all in bytes; `pair_state` (bit0 started from the web and not stopped, kept in `webui.c`; bit1 `sys_status.pair_success`, set by `events.c`); `eth_state` (`"link,speed,duplex,tx,rx,rx_err,rx_ovf"`, read straight from the `gmac` driver struct in `device.c`, `struct hg_gmac_eva` in `hg_gmac_eva.h`; the counters are frames, the driver keeps no byte counts, and the Ethernet port is bridged, not an lwIP netif, so lwIP stats do not see it either; only with `GMAC_ENABLE`).
+ - WiFi key: an empty `sys_cfgs.passwd` means the raw `psk` is the key (set by `wifi_passwd=<64 hex>`, `AT+PSK`, or a successful pairing on a station, which all clear `passwd`). Then `wifi_passwd=?` returns the PSK as 64 hex digits, and an SSID change keeps the key instead of re-deriving it (as the vendor `AT+SSID` does). A passphrase is limited to 32 characters by `passwd[PASSWD_MAX_LEN+1]`.
+-- DHCP host name: the DHCP client on `w0` sends option 12 as `<devname>-<last 3 MAC bytes in hex>` (e.g. `tx-a16898`; devname is the web UI "Device name", default `tx`, filtered to `[A-Za-z0-9-]`). `sys_dhcp_hostname()` in `main.c` builds it; the `LWIP_HOOK_DHCP_APPEND_OPTIONS` hook defined at the top of lwIP `dhcp.c` appends it to DISCOVER, REQUEST and INFORM. This avoids `LWIP_NETIF_HOSTNAME`, which would change `struct netif` (shared with the closed libs); lwIP's own option also skips DISCOVER. Read-only web key `dhcp_name`, shown on Status → Network. A changed device name is sent from the next DHCP request on (renewal or reboot).
++- DHCP host name: the DHCP client on `w0` sends option 12 as `<devname>-<last 3 MAC bytes in hex>` (e.g. `tx-a16898`; devname is the web UI "Device name", default `tx`, filtered to `[A-Za-z0-9-]`). `sys_dhcp_hostname()` in `main.c` builds it; the `LWIP_HOOK_DHCP_APPEND_OPTIONS` hook defined at the top of lwIP `dhcp.c` appends it to DISCOVER, REQUEST and INFORM. This avoids `LWIP_NETIF_HOSTNAME`, which would change `struct netif` (shared with the closed libs); lwIP's own option also skips DISCOVER. Read-only web key `dhcp_name`, shown on Status → Network. A changed device name is sent from the next DHCP request on (renewal or reboot). Verified on hardware 2026-11-20: the name shows in the router's lease list.
+ - Station IPs in `stalist`: the AP's own DHCP lease (`dhcpd_get_lease_ip`) if there is one, else a 16-entry MAC→IP table learned from ARP frames reaching the stack (`sys_netif_rx_snoop` in `webui.c`, called from `lwip_netif_hook_inputdata` in lwIP `ethernetif.c`, weak no-op there). In a bridge the LAN router hands out addresses, so the lease is usually missing. All LAN hosts go in and the oldest entry is replaced. A station's `w0` MAC equals its radio MAC, so the lookup by the stalist MAC works (verified on hardware 2026-11-20).
+ - Default web password is `admin` (`WEBUI_DEFAULT_PASSWD`), stored in the `webcfg` region.
+ - UI source: `../web` in the taixin-halow-bridge repo (Vue 3 + Vite, modified from the vendor's version). Its `AGENTS.md` is outdated: vue-i18n, vue-router and @vicons/utils were replaced by small stand-ins in `src/lite/`, mapped through aliases in `vite.config.ts` **and** `tsconfig.json`. The UI is English-only; a Vite plugin keeps only `enUS` from each SFC `<i18n>` block.
