@@ -304,6 +304,7 @@
             </span>
           </label>
         </div>
+        <p class="note">{{t('compatNote')}}</p>
         <p class="note" v-if="dashboardStore.deviceConfig.fixWiFiMode">{{t('pinNote')}}</p>
         <p class="note warn" v-if="savedMode && curMode !== savedMode">{{t('rebootNote')}}</p>
       </fieldset>
@@ -412,11 +413,12 @@
     "enUS": {
       "header": "WiFi",
       "WiFiMode": "Operating mode",
-      "modeIntro": "A link needs one access point and one station of the same type: AP with Station, or WNB AP with WNB Station. Use the standard modes to work with other vendors' HaLow devices; use WNB when both ends are these bridges.",
-      "help_ap": "Standard 802.11ah (Wi-Fi HaLow) access point. Use on the side connected to your main network. Any HaLow station can join, including a bridge in Station mode.",
-      "help_wnbap": "Access point using Taixin's WNB bridge protocol instead of standard 802.11ah. Only bridges in WNB Station mode can connect.",
-      "help_sta": "Standard 802.11ah client. Joins the access point below and bridges this device's Ethernet port onto that network. Works with any HaLow access point.",
-      "help_wnbsta": "Client using Taixin's WNB bridge protocol. Connects only to a bridge in WNB Access Point mode, and can roam between WNB access points.",
+      "modeIntro": "A link needs one access point and one station of the same type: AP with Station, or WNB AP with WNB Station.",
+      "compatNote": "Note: for now, the Access Point and Station modes only link Taixin devices running 2.x firmware. Use the WNB modes to connect to devices on legacy 1.6x firmware.",
+      "help_ap": "802.11ah (Wi-Fi HaLow) access point. Use on the side connected to your main network. Taixin devices on 2.x firmware in Station mode can join.",
+      "help_wnbap": "Access point using Taixin's WNB bridge protocol. Bridges in WNB Station mode can connect, including devices on legacy 1.6x firmware.",
+      "help_sta": "802.11ah client. Joins the access point below and bridges this device's Ethernet port onto that network. Works with Taixin access points on 2.x firmware.",
+      "help_wnbsta": "Client using Taixin's WNB bridge protocol. Connects to a bridge in WNB Access Point mode, including devices on legacy 1.6x firmware, and can roam between WNB access points.",
       "help_apsta": "Joins an upstream access point and re-broadcasts it as a second access point to extend range.",
       "pinNote": "The access point / station side is set by the role pin (PA_8) at power-up, so only the protocol type can be changed here.",
       "rebootNote": "Saving a new mode reboots the device (about 20 seconds). If it gets its IP address by DHCP, the address may change.",

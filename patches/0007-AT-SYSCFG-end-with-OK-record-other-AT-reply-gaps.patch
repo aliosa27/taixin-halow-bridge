@@ -1,7 +1,7 @@
 From 7e9caded633d705e70a896fcd199ba143dd61c5d Mon Sep 17 00:00:00 2001
 From: aliosa27 <aliosa27@aliosa27.me>
 Date: Wed, 18 Nov 2026 20:40:42 -0800
-Subject: [PATCH 07/17] AT+SYSCFG: end with OK; record other AT reply gaps
+Subject: [PATCH 07/18] AT+SYSCFG: end with OK; record other AT reply gaps
 
 The dump still goes to the UART log (syscfg_dump uses os_printf), but the
 command now terminates, so the web AT console returns immediately instead

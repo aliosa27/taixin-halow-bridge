@@ -1,7 +1,7 @@
 From 45b7fa7e7eeda728726d87515fa970c15c211ad5 Mon Sep 17 00:00:00 2001
 From: aliosa27 <aliosa27@aliosa27.me>
 Date: Thu, 19 Nov 2026 16:36:49 -0800
-Subject: [PATCH 09/17] Web UI: pair button and raw PSK entry; fix doubled MHz
+Subject: [PATCH 09/18] Web UI: pair button and raw PSK entry; fix doubled MHz
  in scan list
 
 - post.action pair=1|0 starts/stops pairing (same call as the pair button

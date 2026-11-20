@@ -1,7 +1,7 @@
 From 33977d0ea3b86053ff700aac846d7cc1b4febf94 Mon Sep 17 00:00:00 2001
 From: aliosa27 <aliosa27@aliosa27.me>
 Date: Wed, 18 Nov 2026 20:00:20 -0800
-Subject: [PATCH 04/17] Show firmware build date and time in the web UI
+Subject: [PATCH 04/18] Show firmware build date and time in the web UI
 
 - webui.c: read-only key "buildtime" (__DATE__ __TIME__)
 - prebuild.sh: delete Obj/webui.o before each build so the stamp is fresh
