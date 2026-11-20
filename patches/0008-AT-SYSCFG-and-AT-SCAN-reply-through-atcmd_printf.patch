@@ -1,0 +1,167 @@
+From 26e4a7bccdde7fe81cfb5f6d5769693aba45b8ee Mon Sep 17 00:00:00 2001
+From: aliosa27 <aliosa27@aliosa27.me>
+Date: Thu, 19 Nov 2026 10:09:27 -0800
+Subject: [PATCH 08/11] AT+SYSCFG and AT+SCAN? reply through atcmd_printf
+
+syscfg_dump() now prints with atcmd_printf, so AT+SYSCFG output reaches
+the web AT console and netAT, not only the UART log.
+
+AT+SCAN? lists the last scan results (+SCAN:<bssid>,<MHz>,<signal>,
+<enc>,<ssid>) then OK; AT+SCAN still only starts the scan. Also fix the
+handler's ifidx type (uint8 made the "< 0" check dead).
+---
+ NOTES.md               |  2 +-
+ project/syscfg.c       | 59 ++++++++++++++++++++++++++----------------
+ sdk/lib/common/atcmd.c | 22 +++++++++++++++-
+ 3 files changed, 58 insertions(+), 25 deletions(-)
+
+diff --git a/NOTES.md b/NOTES.md
+index d0066d3..bea18da 100644
+--- a/NOTES.md
++++ b/NOTES.md
+@@ -73,7 +73,7 @@ So the DHCP change was not the (only) cause. **Leading theory: the image size.**
+ 
+ ## AT reply gaps (found 2026-11-18, not fixed yet)
+ 
+-The web AT console (and any AT client) waits for `OK`/`ERROR`, which only `atcmd_printf` output carries. `os_printf` output, including `atcmd_err()`, goes to the UART log only. Of the handlers in `sdk/lib/common/atcmd.c`, only `AT+SYSCFG` has been fixed: `atcmd_ok` after `syscfg_dump()`. The other 123 handlers are in the closed libs and were not audited. Still open, on the user's request:
++The web AT console (and any AT client) waits for `OK`/`ERROR`, which only `atcmd_printf` output carries. `os_printf` output, including `atcmd_err()`, goes to the UART log only. Of the handlers in `sdk/lib/common/atcmd.c`, only `AT+SYSCFG` has been fixed: `syscfg_dump()` (`project/syscfg.c`, called only from that handler) prints with `atcmd_printf`, and the handler ends with `atcmd_ok`. `AT+SCAN` only starts a background scan; `AT+SCAN?` (added) lists the last results as `+SCAN:<bssid>,<MHz>,<signal>,<enc 0|1>,<ssid>` lines, then `OK`. The other 123 handlers are in the closed libs and were not audited. Still open, on the user's request:
+ 
+ - **No reply on the normal path:**
+   - `AT+LOADDEF`: resets without `OK`; `AT+RST` sends `OK` first.
+diff --git a/project/syscfg.c b/project/syscfg.c
+index e9d55aa..298f95b 100644
+--- a/project/syscfg.c
++++ b/project/syscfg.c
+@@ -325,47 +325,60 @@ void syscfg_flush(void)
+     }
+ }
+ 
++/* dump_key() prints with _os_printf (UART log); this one goes through atcmd_printf */
++static void syscfg_dump_key(const char *str, const uint8 *key)
++{
++    char hex[65];
++    int32 i;
++    for (i = 0; i < 32; i++) {
++        os_sprintf(hex + 2 * i, "%02x", key[i]);
++    }
++    atcmd_printf("%s%s\r\n", str, hex);
++}
++
++/* AT+SYSCFG. Uses atcmd_printf so the reply reaches whichever AT front end
++   sent the command (UART, netAT, web console), not just the UART log. */
+ void syscfg_dump(void)
+ {
+     int32 i = 0;
+-    _os_printf("%s", sdk_version_str());
+-    _os_printf("SYSCFG: %d \r\n", sys_cfgs.cfg_init);
+-    _os_printf("  mac:"MACSTR", bssid:"MACSTR"\r\n", MAC2STR(sys_cfgs.mac), MAC2STR(sys_cfgs.bssid));
+-    _os_printf("  mode:%s, bss_bw:%d\r\n", wificfg_wifimode_str(), sys_cfgs.bss_bw);
+-    _os_printf("  chan_list:");
++    atcmd_printf("%s", sdk_version_str());
++    atcmd_printf("SYSCFG: %d \r\n", sys_cfgs.cfg_init);
++    atcmd_printf("  mac:"MACSTR", bssid:"MACSTR"\r\n", MAC2STR(sys_cfgs.mac), MAC2STR(sys_cfgs.bssid));
++    atcmd_printf("  mode:%s, bss_bw:%d\r\n", wificfg_wifimode_str(), sys_cfgs.bss_bw);
++    atcmd_printf("  chan_list:");
+     for (i = 0; i < sys_cfgs.chan_cnt; i++){
+-        _os_printf(" %d", sys_cfgs.chan_list[i]);
++        atcmd_printf(" %d", sys_cfgs.chan_list[i]);
+     }
+-    _os_printf(", chan_cnt:%d\r\n", sys_cfgs.chan_cnt);
+-    _os_printf("  ssid:%s, passwd:%s, key_mgmt:%s, mkey_set:%d\r\n", sys_cfgs.ssid, sys_cfgs.passwd, wificfg_keymgmt_str(), sys_cfgs.mkey_set);
+-    dump_key("  psk: ", sys_cfgs.psk, 32, 0);
++    atcmd_printf(", chan_cnt:%d\r\n", sys_cfgs.chan_cnt);
++    atcmd_printf("  ssid:%s, passwd:%s, key_mgmt:%s, mkey_set:%d\r\n", sys_cfgs.ssid, sys_cfgs.passwd, wificfg_keymgmt_str(), sys_cfgs.mkey_set);
++    syscfg_dump_key("  psk: ", sys_cfgs.psk);
+ #if WIFI_REPEATER_SUPPORT
+-    _os_printf("  r_ssid:%s, r_passwd:%s, r_key_mgmt:%s\r\n",  sys_cfgs.r_ssid, sys_cfgs.r_passwd, wificfg_keymgmt_str());
+-    dump_key("  r_psk:", sys_cfgs.r_psk, 32, 0);
++    atcmd_printf("  r_ssid:%s, r_passwd:%s, r_key_mgmt:%s\r\n",  sys_cfgs.r_ssid, sys_cfgs.r_passwd, wificfg_keymgmt_str());
++    syscfg_dump_key("  r_psk:", sys_cfgs.r_psk);
+ #endif
+-    _os_printf("  sta_max:%d, acs_enable:%d, acs_tmo:%d, ack_tmo:%d\r\n",
++    atcmd_printf("  sta_max:%d, acs_enable:%d, acs_tmo:%d, ack_tmo:%d\r\n",
+               sys_cfgs.sta_max,
+               sys_cfgs.acs_enable,
+               sys_cfgs.acs_tmo,
+               sys_cfgs.ack_tmo);
+-    _os_printf("  txpwer:%d, pwr_super:%d\r\n", 
++    atcmd_printf("  txpwer:%d, pwr_super:%d\r\n", 
+               sys_cfgs.txpower,
+               sys_cfgs.super_pwr_set?sys_cfgs.super_pwr:TX_PWR_SUPER_EN);
+-    _os_printf("  bss_max_idle:%d, beacon_int:%d, dtim_period:%d\r\n", 
++    atcmd_printf("  bss_max_idle:%d, beacon_int:%d, dtim_period:%d\r\n", 
+         sys_cfgs.bss_max_idle, sys_cfgs.beacon_int, sys_cfgs.dtim_period);
+-    _os_printf("  dhcpc_en:%d, dhcpd_en:%d, use4addr:%d, devname:%s\n", 
++    atcmd_printf("  dhcpc_en:%d, dhcpd_en:%d, use4addr:%d, devname:%s\n", 
+         sys_cfgs.dhcpc_en, sys_cfgs.dhcpd_en, sys_cfgs.use4addr, sys_cfgs.devname);
+-    _os_printf("  AP default: ipaddr:"IPSTR", netmask:"IPSTR", gw:"IPSTR"\n", 
++    atcmd_printf("  AP default: ipaddr:"IPSTR", netmask:"IPSTR", gw:"IPSTR"\n", 
+         IP2STR_N(sys_cfgs.ipaddr), IP2STR_N(sys_cfgs.netmask), IP2STR_N(sys_cfgs.gw_ip));
+-    _os_printf("  dhcpd_start_ip:"IPSTR", dhcpd_end_ip:"IPSTR", dhcpd_lease_time:%d\n", 
++    atcmd_printf("  dhcpd_start_ip:"IPSTR", dhcpd_end_ip:"IPSTR", dhcpd_lease_time:%d\n", 
+         IP2STR_N(sys_cfgs.dhcpd_startip), IP2STR_N(sys_cfgs.dhcpd_endip), sys_cfgs.dhcpd_lease_time);
+-    _os_printf("  roam_start:%d, roam_rssi_th:%d, roam_rssi_diff:%d, roam_rssi_int:%d\r\n", 
++    atcmd_printf("  roam_start:%d, roam_rssi_th:%d, roam_rssi_diff:%d, roam_rssi_int:%d\r\n", 
+               sys_cfgs.roam_start,
+               sys_cfgs.roam_rssi_th,
+               sys_cfgs.roam_rssi_diff,
+               sys_cfgs.roam_rssi_int);
+ #ifdef CONFIG_SLEEP
+-    _os_printf("  psmode:%d, wkup_io:%d, wkio_edge:%d, dcdc13:%d\r\n",
++    atcmd_printf("  psmode:%d, wkup_io:%d, wkio_edge:%d, dcdc13:%d\r\n",
+               sys_cfgs.psmode,
+               sys_cfgs.wkup_io,
+               sys_cfgs.wkio_edge,
+@@ -373,15 +386,15 @@ void syscfg_dump(void)
+ #endif
+ #if SYS_SAVE_PAIRSTA
+     if (!IS_ZERO_ADDR(sys_cfgs.pair_stas[0])) {
+-        _os_printf("  Pair STAs:\r\n");
++        atcmd_printf("  Pair STAs:\r\n");
+     } else {
+-        _os_printf("  No pair STAs\r\n");
++        atcmd_printf("  No pair STAs\r\n");
+     }
+     for (uint8 i = 0; i < SYS_STA_MAX; i++) {
+         if (!IS_ZERO_ADDR(sys_cfgs.pair_stas[i])) {
+-            _os_printf("    STA%d "MACSTR"\r\n", i, MAC2STR(sys_cfgs.pair_stas[i]));
++            atcmd_printf("    STA%d "MACSTR"\r\n", i, MAC2STR(sys_cfgs.pair_stas[i]));
+         }
+     }
+ #endif
+-    _os_printf("\r\n");
++    atcmd_printf("\r\n");
+ }
+diff --git a/sdk/lib/common/atcmd.c b/sdk/lib/common/atcmd.c
+index 500c20a..ed1e0c1 100644
+--- a/sdk/lib/common/atcmd.c
++++ b/sdk/lib/common/atcmd.c
+@@ -370,7 +370,27 @@ int32 sys_wifi_atcmd_loaddef(const char *cmd, char *argv[], uint32 argc)
+ 
+ int32 sys_wifi_atcmd_scan(const char *cmd, char *argv[], uint32 argc)
+ {
+-    uint8 ifidx = wificfg_get_ifidx(sys_cfgs.wifi_mode, 0);
++    int32 ifidx = wificfg_get_ifidx(sys_cfgs.wifi_mode, 0);   /* was uint8, so "ifidx < 0" never matched */
++
++    if (argc == 1 && argv[0][0] == '?') {
++        /* AT+SCAN? : results of the last scan, one +SCAN: line per BSS.
++           AT+SCAN only starts the scan; it runs in the background. */
++        struct hgic_bss_info *list = os_zalloc(sizeof(*list) * HGIC_SCAN_MAX_NUM);
++        int32 i, cnt;
++        if (list == NULL) {
++            atcmd_printf("ERROR\r\n");
++            return 0;
++        }
++        cnt = ieee80211_get_bsslist(list, HGIC_SCAN_MAX_NUM);
++        for (i = 0; i < cnt; i++) {
++            atcmd_printf("+SCAN:" MACSTR ",%u.%u,%d,%d,%.32s\r\n", MAC2STR(list[i].bssid),
++                         list[i].freq / 10, list[i].freq % 10, list[i].signal,
++                         list[i].encrypt ? 1 : 0, list[i].ssid);
++        }
++        os_free(list);
++        atcmd_ok;
++        return 0;
++    }
+ 
+     if (argc == 2) {
+         struct ieee80211_scandata scan;

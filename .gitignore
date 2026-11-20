@@ -1,0 +1,7 @@
+# Patched vendor tree created by scripts/apply.sh (its own git repo)
+/TXW8301_WNB/
+
+# Web UI build
+web/node_modules/
+web/dist/
+

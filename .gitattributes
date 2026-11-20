@@ -1,0 +1,4 @@
+# Patches must stay byte-exact (one file in them has CRLF lines); scripts run in bash.
+patches/*.patch -text
+*.sh text eol=lf
+scripts/upstream.env text eol=lf

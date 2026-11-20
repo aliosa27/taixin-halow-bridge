@@ -1,0 +1,15 @@
+taixin-halow-bridge
+
+This project contains modifications of, and patches to, the following works
+by Taixin Semiconductor, licensed under the Apache License, Version 2.0:
+
+  TXW8301_WNB    https://github.com/Taixin-Semiconductor/TXW8301_WNB
+                 Copyright 2026 Taixin Semiconductor
+                 patches/ apply to commit 0e273c80ee141a8ee1273027d57a1aeaa8ec843c
+
+  hgic-wnb-web   https://github.com/Taixin-Semiconductor/hgic-wnb-web
+                 web/ is a modified version, derived from commit
+                 2e0384c0a0fcbb335a04d260acd2bfc95d5daaa8
+
+The patches and the files in web/ have been modified from the originals;
+see the git history and the commit messages of patches/ for the changes.

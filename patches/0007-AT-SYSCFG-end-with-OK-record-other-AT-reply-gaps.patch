@@ -1,0 +1,54 @@
+From 7e9caded633d705e70a896fcd199ba143dd61c5d Mon Sep 17 00:00:00 2001
+From: aliosa27 <aliosa27@aliosa27.me>
+Date: Wed, 18 Nov 2026 20:40:42 -0800
+Subject: [PATCH 07/11] AT+SYSCFG: end with OK; record other AT reply gaps
+
+The dump still goes to the UART log (syscfg_dump uses os_printf), but the
+command now terminates, so the web AT console returns immediately instead
+of waiting 4 s. NOTES.md lists the other handlers that lack OK/ERROR.
+---
+ NOTES.md               | 18 ++++++++++++++++++
+ sdk/lib/common/atcmd.c |  1 +
+ 2 files changed, 19 insertions(+)
+
+diff --git a/NOTES.md b/NOTES.md
+index 4185919..d0066d3 100644
+--- a/NOTES.md
++++ b/NOTES.md
+@@ -71,6 +71,24 @@ So the DHCP change was not the (only) cause. **Leading theory: the image size.**
+ - **Debug page log tail.** `logread=<seq>` used a `print_redirect()` hook into a 4 KB ring buffer (code in the initial commit). The AT console part of the debug page was re-added on its own on 2026-11-18.
+ - **Editable `wifi_chan_list`**: re-added on 2026-11-18 as part of the region and bandwidth picker; see Web UI.
+ 
++## AT reply gaps (found 2026-11-18, not fixed yet)
++
++The web AT console (and any AT client) waits for `OK`/`ERROR`, which only `atcmd_printf` output carries. `os_printf` output, including `atcmd_err()`, goes to the UART log only. Of the handlers in `sdk/lib/common/atcmd.c`, only `AT+SYSCFG` has been fixed: `atcmd_ok` after `syscfg_dump()`. The other 123 handlers are in the closed libs and were not audited. Still open, on the user's request:
++
++- **No reply on the normal path:**
++  - `AT+LOADDEF`: resets without `OK`; `AT+RST` sends `OK` first.
++  - `AT+RSSI`: without `?` there is no reply. The Debug page quick button sends `AT+RSSI`; it should be `AT+RSSI?`.
++  - `AT+CHAN_LIST?` and `AT+SET_WMM?`: no `OK`.
++  - `AT+PSK?`: replies `+PSK:+PSK` `OK`, then the hex key after the `OK` with no line end.
++  - `AT+SSID=<same>`: no `OK`.
++  - `AT+WIFIMODE=<unknown>`: neither `OK` nor `ERROR`.
++  - `AT+WAKEUP` failure: prints `WAKE_ERR:n` instead of `ERROR`.
++  - `AT+ICMPMNTR` bad input: `atcmd_err` goes to the log.
++- **No reply with a wrong argument count:** `AT+APHIDE`, `AT+AP_PSMODE`, `AT+DSLEEP`, `AT+BSS_BW`, `AT+CHANNEL`, `AT+ENCRYPT`, `AT+WIFIMODE`, `AT+WAKEUP`, `AT+SET_WMM`.
++- **Odd replies:**
++  - `AT+KEY?` replies twice (`+KEY:+KEY OK`, then `+KEY:<pass> OK`).
++  - A short `AT+KEY` gets both `OK` and `ERROR`.
++
+ ## Conventions
+ 
+ - Firmware sources use CRLF line endings. Keep them; in-place `sed -i` under Git Bash converts files to LF.
+diff --git a/sdk/lib/common/atcmd.c b/sdk/lib/common/atcmd.c
+index 709a7a0..500c20a 100644
+--- a/sdk/lib/common/atcmd.c
++++ b/sdk/lib/common/atcmd.c
+@@ -46,6 +46,7 @@ int32 sys_syscfg_dump_hdl(const char *cmd, char *argv[], uint32 argc)
+ {
+     void syscfg_dump(void);
+     syscfg_dump();
++    atcmd_ok;                                    /* dump goes to the UART log; OK ends the command (web AT console) */
+     return 0;
+ }
+ 
