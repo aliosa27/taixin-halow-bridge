@@ -24,7 +24,7 @@
     useScope: 'global'
   });
 
-  const pollData = ['s_ipaddr', 's_netmask', 's_gw_ip', 'uptime', 'fwver', 'buildtime', 'mac_addr',
+  const pollData = ['s_ipaddr', 's_netmask', 's_gw_ip', 'uptime', 'fwver', 'buildtime', 'mac_addr', 'dhcp_name',
     'heap_free', 'heap_total', 'skb_free', 'skb_total', 'eth_state',
     'dhcpc_en', 'wifi_mode', 'wifi_wnb', 'wifi_ssid', 'wifi_r_ssid', 'wifi_keymgmt'] as const;
 
@@ -177,6 +177,9 @@
       <h3><Icon><SettingsEthernetOutlined /></Icon>{{t('LAN')}}</h3>
       <dl class="kv">
         <dt>{{t('ipMode')}}</dt><dd>{{ipMode}}</dd>
+        <template v-if="statusPoll.dhcp_name">
+          <dt>{{t('hostname')}}</dt><dd>{{statusPoll.dhcp_name}}</dd>
+        </template>
         <dt>{{t('ipAddr')}}</dt><dd>{{statusPoll.s_ipaddr}}</dd>
         <dt>{{t('netmask')}}</dt><dd>{{statusPoll.s_netmask}}</dd>
         <dt>{{t('gwIP')}}</dt><dd>{{statusPoll.s_gw_ip}}</dd>
@@ -218,6 +221,7 @@
       "macAddr": "MAC address",
       "LAN": "Network",
       "ipMode": "IP mode",
+      "hostname": "Host name",
       "ipAddr": "IP address",
       "netmask": "Netmask",
       "gwIP": "Gateway",

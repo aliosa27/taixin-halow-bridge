@@ -1,7 +1,7 @@
 From ee45e5a96d0d849073e997de862b41f60a2043c8 Mon Sep 17 00:00:00 2001
 From: aliosa27 <aliosa27@aliosa27.me>
 Date: Thu, 19 Nov 2026 18:16:10 -0800
-Subject: [PATCH 10/13] DHCP fallback to 192.168.123.1; link rate and client
+Subject: [PATCH 10/14] DHCP fallback to 192.168.123.1; link rate and client
  signal in web UI
 
 ---
