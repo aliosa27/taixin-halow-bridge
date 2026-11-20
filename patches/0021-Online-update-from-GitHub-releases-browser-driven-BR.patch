@@ -1,7 +1,7 @@
-From d36e1d89c7e78cda8e3460b4a6bb34c33e1a39ae Mon Sep 17 00:00:00 2001
+From 74c26508a9505e8a149b6295a2255dce4e52b22d Mon Sep 17 00:00:00 2001
 From: aliosa27 <aliosa27@aliosa27.me>
 Date: Fri, 20 Nov 2026 11:15:42 -0800
-Subject: [PATCH 20/20] Online update from GitHub releases/ (browser-driven);
+Subject: [PATCH 21/21] Online update from GitHub releases/ (browser-driven);
  BRIDGE_RELEASE version suffix
 
 ---
@@ -12,7 +12,7 @@ Subject: [PATCH 20/20] Online update from GitHub releases/ (browser-driven);
  4 files changed, 3586 insertions(+), 3488 deletions(-)
 
 diff --git a/NOTES.md b/NOTES.md
-index 8ee6bf8..0592a64 100644
+index fba9e53..e6c5b49 100644
 --- a/NOTES.md
 +++ b/NOTES.md
 @@ -37,6 +37,7 @@ Taixin TXW8301 (TXW4002A, C-SKY CK803) HaLow wireless-bridge (WNB) firmware SDK

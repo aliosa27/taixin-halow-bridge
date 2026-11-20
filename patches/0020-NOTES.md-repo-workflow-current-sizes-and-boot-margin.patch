@@ -1,0 +1,64 @@
+From 04a62cc8ff4f7c5f5cb34dce0d9abca697d0c4f7 Mon Sep 17 00:00:00 2001
+From: aliosa27 <aliosa27@aliosa27.me>
+Date: Fri, 20 Nov 2026 15:48:56 -0800
+Subject: [PATCH 20/21] NOTES.md: repo workflow, current sizes and boot margin,
+ UI wording notes, LF line endings
+
+---
+ NOTES.md | 20 ++++++++++++++++----
+ 1 file changed, 16 insertions(+), 4 deletions(-)
+
+diff --git a/NOTES.md b/NOTES.md
+index 8ee6bf8..fba9e53 100644
+--- a/NOTES.md
++++ b/NOTES.md
+@@ -44,8 +44,10 @@ Taixin TXW8301 (TXW4002A, C-SKY CK803) HaLow wireless-bridge (WNB) firmware SDK
+   1. `npm run build` in `../web` (runs `vue-tsc`).
+   2. `powershell -ExecutionPolicy Bypass -File project\utilities\gen_webui_page.ps1` (regenerates `project/webui_page.h`; `-Placeholder` writes a stub page).
+   3. Rebuild the firmware.
+-  4. Check the gzip size reported by step 2. It is ~53 KB now; it costs the same amount of SRAM and counts against the OTA limit.
+-- The UI was written for 2.4 GHz chips. The hostname is limited to 7 characters (`devname[8]`).
++  4. Check the gzip size reported by step 2. It is 56,502 bytes on `main` (2026-11-20); it costs the same amount of SRAM and counts against the OTA limit. Also check `__heap_start` in `project.map` against the table under Parked ideas.
++- The UI was written for 2.4 GHz chips. The hostname is limited to 7 characters (`devname[8]`). The Device page enforces that (`maxlength`, counter) and shows a read-only preview of the DHCP host name; the preview repeats the rules of `sys_dhcp_hostname()`, so change both together.
++- Mode wording (WiFi page, `wifiBasic.vue`): the standard AP/Station modes only link Taixin devices on 2.x firmware for now; the WNB modes also connect to devices on legacy 1.6x firmware. The About page links the GitHub releases page.
++- Layout: `.kv` key/value lists in `.card`s (`src/assets/style.css`) keep values on one line and let the card grow; the e2e test checks that the MAC on Status stays on one line. Pages with long values (About) set wrapping in their own scoped style.
+ - Radio page: you pick region, bandwidth and channel, and the UI derives `wifi_chan_list` and `wifi_chan` (1-based index) from the 802.11ah plans in `src/utils/halowPlan.ts`: US 902–928, EU 863–868 (1/2 MHz only), China 760–784, plus Custom (free list). Region is not stored; it is inferred from the saved list. Plans longer than 16 (US 1 MHz) store the 16 channels around the selected one. Firmware side:
+   - `wifi_chan_list` is writable (each entry checked with `sysctrl_freq_type_match`).
+   - `module_type` (read-only) filters the regions to the module's tuning range. The ranges, disassembled from `sysctrl_freq_type_match`: 750M 730–830, 810M 790–830, 850M 840–860, 860M 830–890, 900M 830–930 MHz.
+@@ -54,7 +56,7 @@ Taixin TXW8301 (TXW4002A, C-SKY CK803) HaLow wireless-bridge (WNB) firmware SDK
+ 
+ ## Parked ideas (each broke boot; all reverted)
+ 
+-Known-good state: the embedded page is 49,693 bytes (gzip), and `webui.c` has none of the features below. Two builds failed to boot:
++When these were parked, the known-good page was 49,693 bytes (gzip). Two builds failed to boot:
+ 
+ - 2026-11-17: DHCP host name, debug page and editable channel list together. The page was ~54 KB.
+ - 2026-11-18: debug page and editable channel list only, without the DHCP change. The page was 53.4 KB, the image 474,640 bytes, and the SKB pool ~95 KB (pool `__heap_start` 0x20079210 to `__heap_end` 0x200b0000, minus 60 KB heap and 64 KB RX buffer).
+@@ -65,6 +67,9 @@ Measured from `project.map` ("Total ROM Size", and `__heap_start`, where the poo
+ |---|---|---|---|
+ | Debug page + editable channel list, 2026-11-18 | 461,536 | 0x20079210 | no |
+ | AT console, without ping/iperf, 2026-11-18 | 456,368 | 0x20076a2c | yes |
++| `main` with free flash, host name preview, About releases link, 2026-11-20 (raw image 462,680, page 56.5 KB) | | 0x200785ec | yes |
++
++The last booted build is only ~3 KB below the failing one, so treat ~3 KB as the remaining margin until the cause is known.
+ 
+ Check these numbers after every build that grows the image.
+ 
+@@ -92,9 +97,16 @@ The web AT console (and any AT client) waits for `OK`/`ERROR`, which only `atcmd
+   - `AT+KEY?` replies twice (`+KEY:+KEY OK`, then `+KEY:<pass> OK`).
+   - A short `AT+KEY` gets both `OK` and `ERROR`.
+ 
++## Repository and workflow
++
++- This tree is generated: the outer taixin-halow-bridge repo stores `patches/*.patch` against the vendor commit `FW_BASE` (`scripts/upstream.env`), and `scripts/apply.sh` clones the vendor repo and applies them on a branch `bridge`. `web/` (the UI) lives only in the outer repo.
++- To change firmware: commit here on `bridge`, then run `scripts/export-patches.sh` in the outer repo (refuses to run with uncommitted changes; `project/txw4002a.mk` is ignored) and commit `patches/` together with any `web/` changes. Every patch's `[PATCH n/N]` line changes when the series grows; that is expected.
++- Branches: outer `main` ↔ firmware `bridge`. The online updater lives on outer `online-update` ↔ firmware `online-update` (one extra commit on top of `bridge`). To bring `main` changes over: rebase the firmware `online-update` onto `bridge` (regenerate `webui_page.h` on conflict), merge `main` into the outer `online-update` (no force push), rebuild `web/`, regenerate the page and re-export the patches.
++- Every change is built in CDK and boot-tested on hardware before it is committed.
++
+ ## Conventions
+ 
+-- Firmware sources use CRLF line endings. Keep them; in-place `sed -i` under Git Bash converts files to LF.
++- Files in this tree are stored with LF (`* text=auto eol=lf`), except `project/txw4002a.cdkproj` (CRLF upstream, applied with `--keep-cr`). The outer repo keeps `patches/*.patch` byte-exact (`-text`).
+ - C style follows the vendor: `int32`/`uint8` types, `os_*` wrappers (`os_malloc`, `os_printf`, `os_strcmp`…), 4-space indent, `RET_OK`.
+ - Comments in vendor files are partly Chinese; leave them as they are.
+ - Check the dev-only `SYS_APP_*` flags (`project_config.h`) before shipping, along with demo credentials: default WiFi passphrase `12345678` and web password `admin`.

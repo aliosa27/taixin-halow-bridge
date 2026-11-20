@@ -1,7 +1,7 @@
 From 7b06031c2c6e60e5ede48a555274915cc5af9d50 Mon Sep 17 00:00:00 2001
 From: aliosa27 <aliosa27@aliosa27.me>
 Date: Fri, 20 Nov 2026 15:27:31 -0800
-Subject: [PATCH 17/20] Free flash in the OTA slot on Status (fw_size, fw_max)
+Subject: [PATCH 17/21] Free flash in the OTA slot on Status (fw_size, fw_max)
 
 ---
  NOTES.md             |    2 +-
