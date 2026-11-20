@@ -31,3 +31,8 @@ export async function reboot(authToken: string): Promise<RET> {
 export async function loadDef(authToken: string): Promise<RET> {
   return deviceCommand('loaddef', authToken);
 }
+
+/** Firmware extension (webui.c): start (true) or stop pairing, like the pair button / AT+PAIR. */
+export async function pairing(on: boolean, authToken: string): Promise<RET> {
+  return deviceCommand(on ? 'pair=1' : 'pair=0', authToken);
+}

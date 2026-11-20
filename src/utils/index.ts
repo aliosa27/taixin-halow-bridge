@@ -189,7 +189,7 @@ const enNumRegex = new RegExp('^[\x20-\x7E]{8,32}$');
 function isPSK(psk: string): INPUT_CHECK {
   if (psk.length < 1)
     return INPUT_CHECK.EMPTY;
-  else if (!enNumRegex.test(psk))
+  else if (!enNumRegex.test(psk) && !/^[0-9a-fA-F]{64}$/.test(psk))   // passphrase, or raw PSK as 64 hex digits
     return INPUT_CHECK.INVALID;
   else
     return INPUT_CHECK.OK;

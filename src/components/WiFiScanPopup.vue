@@ -101,7 +101,7 @@
             </thead>
             <tbody>
               <tr v-for="item in scanList" @click="emitSelected(item)">
-                <td v-if="bigScreen">{{item.freq + 'Mhz'}}</td>
+                <td v-if="bigScreen">{{item.freq}}</td>
                 <td align="center">
                   <Icon v-if="signalDisplay(item.signal) === 4" color="blue"><NetworkWifiFilled /></Icon>
                   <Icon v-else-if="signalDisplay(item.signal) === 3" color="green"><NetworkWifi3BarFilled /></Icon>

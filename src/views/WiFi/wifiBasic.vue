@@ -1,8 +1,8 @@
 <script setup lang="ts">
-  import { ref, reactive, watch, computed, onBeforeMount } from 'vue';
+  import { ref, reactive, watch, computed, onBeforeMount, onBeforeUnmount } from 'vue';
   import { useI18n } from 'vue-i18n';
   import { WIFI_MODE, KEY_MGMT, inputValidate, strObj, INPUT_CHECK, SELECT, wifiModeKey } from '@/utils';
-  import { loadPageData, type apInfoClass } from '@/wnbCom';
+  import { loadPageData, getSettings, pairing, RET, type apInfoClass } from '@/wnbCom';
   import { useFormDataStore, useDashboardStore } from '@/store';
   import { logoutIn3s } from '@/router';
   import msgPopupVue from '@/components/msgPopup.vue';
@@ -217,6 +217,73 @@
     return isAPSide.value ? t('apCfg') : t('staCfg');
   });
 
+  /* ---- Pairing (firmware extension: pair=1|0, pair_state bit1 = paired) ---- */
+  const PAIR_LIMIT_MS = 60000;
+  const pairActive = ref<boolean>(false);
+  const pairMsg = ref<string>('');
+  let pairTimer = 0;
+  let pairEnd = 0;
+
+  function pairFinish(msg: string) {
+    clearTimeout(pairTimer);
+    pairActive.value = false;
+    pairMsg.value = msg;
+  }
+
+  async function pairPoll() {
+    const r = await getSettings(['pair_state'], dashboardStore.authToken);
+    if (r.state === RET.AUTH_FAIL) {
+      pairFinish('');
+      popAuthFail.value = true;
+      logoutIn3s();
+      return;
+    }
+    const st = Number(r.settings?.pair_state ?? 0);
+    if (r.state === RET.OK && !(st & 2) && Date.now() < pairEnd) {
+      pairTimer = window.setTimeout(pairPoll, 2000);
+      return;
+    }
+    await pairing(false, dashboardStore.authToken);   // paired, timed out or lost contact: stop, like releasing the button
+    if (st & 2) {
+      pairFinish(t('pairOk'));
+      // a station takes the access point's SSID and key: show what was saved
+      await loadPageData(dashboardStore.authToken, wifiBasicSettingsData, 'wifiBasic',
+        formDataStore.dataStore, settingReactive, popLoadFail, popAuthFail, logoutIn3s);
+    } else {
+      pairFinish(t('pairNone'));
+    }
+  }
+
+  async function pairToggle() {
+    if (pairActive.value) {
+      clearTimeout(pairTimer);
+      await pairing(false, dashboardStore.authToken);
+      pairFinish(t('pairStopped'));
+      return;
+    }
+    const ret = await pairing(true, dashboardStore.authToken);
+    if (ret === RET.AUTH_FAIL) {
+      popAuthFail.value = true;
+      logoutIn3s();
+      return;
+    }
+    if (ret !== RET.OK) {
+      pairMsg.value = t('pairFail');
+      return;
+    }
+    pairActive.value = true;
+    pairMsg.value = t('pairRunning');
+    pairEnd = Date.now() + PAIR_LIMIT_MS;
+    pairTimer = window.setTimeout(pairPoll, 2000);
+  }
+
+  onBeforeUnmount(() => {
+    if (pairActive.value) {
+      clearTimeout(pairTimer);
+      pairing(false, dashboardStore.authToken);
+    }
+  });
+
 </script>
 
 <template>
@@ -269,8 +336,18 @@
         </div>
         <div class="ctrl-group" v-if="settingReactive.wifi_keymgmt !== KEY_MGMT.NONE">
           <label for="passphase">{{t('psk')}}</label>
-          <input type="text" id="passphase" v-model.trim="settingReactive.wifi_passwd" />
+          <input type="text" id="passphase" class="wide" v-model.trim="settingReactive.wifi_passwd" />
           <span class="msg-warn">{{showInputErrMsg.psk}}</span>
+          <span class="msg-help">{{t('pskHelp')}}</span>
+        </div>
+      </fieldset>
+      <fieldset>
+        <legend>{{t('pairing')}}</legend>
+        <p class="intro">{{t('pairIntro')}}</p>
+        <div class="ctrl-group">
+          <label>{{t('pairing')}}</label>
+          <input type="button" :value="pairActive ? t('pairStop') : t('pairStart')" @click="pairToggle" />
+          <span class="msg-help">{{pairMsg}}</span>
         </div>
       </fieldset>
       <fieldset v-if="settingReactive.wifi_mode === WIFI_MODE.APSTA">
@@ -352,8 +429,18 @@
       "scannerHelpMsg": "Pick an access point from a scan to fill in its SSID.",
       "keymgmt": "Security",
       "open": "Open (no encryption)",
-      "psk": "Passphrase",
-      "hideSSID": "Hide SSID"
+      "psk": "Passphrase or key",
+      "pskHelp": "8–32 characters, or the raw key as 64 hex digits. A key set by AT+PSK or by pairing is shown as hex.",
+      "hideSSID": "Hide SSID",
+      "pairing": "Pairing",
+      "pairIntro": "Same as holding the pair button: start pairing here and on the other device. A station takes the access point's SSID and key. Stops after 60 seconds.",
+      "pairStart": "Start pairing",
+      "pairStop": "Stop pairing",
+      "pairRunning": "Pairing… start pairing on the other device now.",
+      "pairOk": "Paired. Settings below were reloaded.",
+      "pairNone": "Pairing ended without a peer.",
+      "pairStopped": "Pairing stopped.",
+      "pairFail": "Could not start pairing."
     }
   }
 </i18n>

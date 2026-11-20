@@ -3,6 +3,6 @@ export { RET, deviceConfigClass, connStatClass, staInfoClass, apInfoClass, dhcpL
 export { authorization, wnbPing } from "./auth";
 export { getSettings, loadPageData, applySettings } from "./settings";
 export { deviceConfig, connStat, stationList, fetchScanList, dhcpLeaseList, clientList } from "./deviceStatus";
-export { reboot, loadDef } from "./deviceActions";
+export { reboot, loadDef, pairing } from "./deviceActions";
 export { firmwareUpgrade } from "./firmware";
 export { atCommand } from "./debug";
