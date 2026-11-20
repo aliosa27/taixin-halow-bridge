@@ -216,6 +216,7 @@
             <option :value="SELECT.DISABLE">{{t('static')}}</option>
             <option :value="SELECT.ENABLE">DHCP</option>
           </select>
+          <span class="msg-help" v-if="dhcpc_en === SELECT.ENABLE">{{t('dhcpFallback')}}</span>
         </div>
         <div v-if="dhcpc_en === SELECT.DISABLE">
           <div class="ctrl-group">
@@ -289,6 +290,7 @@
       "header": "LAN / IP settings",
       "ip": "Device IP",
       "ipMode": "Device IP Mode",
+      "dhcpFallback": "With no DHCP lease after 60 seconds, the device uses 192.168.123.1 (255.255.255.0) and keeps asking for a lease.",
       "static": "Static",
       "ipaddr": "IP Address",
       "netmask": "Sub Netmask",

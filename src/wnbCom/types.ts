@@ -53,11 +53,17 @@ export class connStatClass {
   rssi: number;
   evm: number;
   channel: number;
-  constructor(connected: boolean, rssi: number, evm: number, channel: number) {
+  txMcs: number;   // firmware extension; -1 = unknown
+  rxMcs: number;
+  bw: number;      // BSS bandwidth, MHz
+  constructor(connected: boolean, rssi: number, evm: number, channel: number, txMcs = -1, rxMcs = -1, bw = 0) {
     this.connected = connected;
     this.rssi = rssi;
     this.evm = evm;
     this.channel = channel;
+    this.txMcs = txMcs;
+    this.rxMcs = rxMcs;
+    this.bw = bw;
   }
 }
 
@@ -70,9 +76,16 @@ export class staInfoClass {
   evm: number;
   tx_snr: number;
   rx_snr: number;
+  txMcs: number;   // firmware extension; -1 = unknown
+  rxMcs: number;
+  bw: number;
   constructor(
-    aid: number, ps: boolean, mac: string, ip: string, rssi: number, evm: number, tx_snr: number, rx_snr: number
+    aid: number, ps: boolean, mac: string, ip: string, rssi: number, evm: number, tx_snr: number, rx_snr: number,
+    txMcs = -1, rxMcs = -1, bw = 0
     ) {
+    this.txMcs = txMcs;
+    this.rxMcs = rxMcs;
+    this.bw = bw;
     this.aid = aid;
     this.ps = ps;
     this.mac = mac;
@@ -113,10 +126,16 @@ export class clientInfoClass {
   mac: string
   ip: string
   signal: number;
-  constructor(type: 'Wired' | 'Wireless', mac: string, ip: string, signal: number) {
+  txMcs: number;
+  rxMcs: number;
+  bw: number;
+  constructor(type: 'Wired' | 'Wireless', mac: string, ip: string, signal: number, txMcs = -1, rxMcs = -1, bw = 0) {
     this.type = type;
     this.mac = mac;
     this.ip = ip;
     this.signal = signal;
+    this.txMcs = txMcs;
+    this.rxMcs = rxMcs;
+    this.bw = bw;
   }
 }

@@ -3,6 +3,7 @@
   import { useI18n } from 'vue-i18n';
   import { getSettings, connStat, RET, type connStatClass } from '@/wnbCom';
   import { WIFI_MODE, KEY_MGMT, SELECT, wifiModeKey } from '@/utils';
+  import { linkRateText } from '@/utils/halowPlan';
   import { useDashboardStore } from '@/store';
   import { logoutIn3s } from '@/router';
   import msgPopupVue from '@/components/msgPopup.vue';
@@ -114,6 +115,13 @@
   }
   const showMem = computed(() => !!statusPoll.heap_total && statusPoll.heap_total !== '0');
 
+  // Station side: PHY rate both ways (firmware extension in conn_state)
+  const linkRate = computed(() => {
+    const tx = linkRateText(connStatDisplay.txMcs, connStatDisplay.bw);
+    const rx = linkRateText(connStatDisplay.rxMcs, connStatDisplay.bw);
+    return tx || rx ? 'TX ' + (tx || '–') + ' · RX ' + (rx || '–') : '';
+  });
+
   const signalStrength = computed(() => {
     return Math.min(Math.max(2 * (connStatDisplay.rssi + 100), 0), 100);
   });
@@ -138,6 +146,9 @@
         <template v-if="showSignal">
           <dt>{{t('signal')}}</dt>
           <dd><progress :value="signalStrength" max="100"></progress> {{connStatDisplay.rssi}} dBm</dd>
+          <template v-if="linkRate">
+            <dt>{{t('linkRate')}}</dt><dd>{{linkRate}}</dd>
+          </template>
         </template>
       </dl>
     </section>
@@ -203,6 +214,7 @@
       "hasClients": "Stations connected",
       "noClients": "No stations",
       "signal": "Signal",
+      "linkRate": "Link rate",
       "memory": "Memory",
       "heap": "System heap",
       "skb": "Packet buffers",

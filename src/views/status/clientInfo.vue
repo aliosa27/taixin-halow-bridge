@@ -4,6 +4,7 @@
   import { useDashboardStore } from '@/store';
   import { clientList, type clientInfoClass, RET } from '@/wnbCom';
   import { useI18n } from 'vue-i18n';
+  import { linkRateText } from '@/utils/halowPlan';
   import msgPopupVue from '@/components/msgPopup.vue';
   import { Icon } from '@vicons/utils';
   import {
@@ -69,7 +70,7 @@
 <template>
   <table>
     <thead>
-      <tr><th>{{t('clientType')}}</th><th>{{t('macAddr')}}</th><th>{{t('ipAddr')}}</th><th>{{t('signal')}}</th></tr>
+      <tr><th>{{t('clientType')}}</th><th>{{t('macAddr')}}</th><th>{{t('ipAddr')}}</th><th>{{t('signal')}}</th><th>{{t('linkRate')}}</th></tr>
     </thead>
     <tbody>
       <tr v-for="item in clientListDisplay">
@@ -88,8 +89,11 @@
           <Icon v-else-if="signalDisplay(item.signal) === 3" color="green"><NetworkWifi3BarFilled /></Icon>
           <Icon v-else-if="signalDisplay(item.signal) === 2" color="orange"><NetworkWifi2BarFilled /></Icon>
           <Icon v-else-if="signalDisplay(item.signal) === 1" color="red"><NetworkWifi1BarFilled /></Icon>
+          {{item.signal}} dBm
         </td>
         <td align="center" v-else>{{t('wired')}}</td>
+        <td v-if="item.type === 'Wireless'" :title="'RX ' + (linkRateText(item.rxMcs, item.bw) || '–')">{{linkRateText(item.txMcs, item.bw) || '–'}}</td>
+        <td v-else>–</td>
       </tr>
       
     </tbody>
@@ -112,7 +116,8 @@
     "wired": "Wired",
     "macAddr": "MAC Address",
     "ipAddr": "IP Address",
-    "signal": "Signal"
+    "signal": "Signal",
+    "linkRate": "TX rate"
   },
   "zhCN": {
     "clientType": "客户端类型",

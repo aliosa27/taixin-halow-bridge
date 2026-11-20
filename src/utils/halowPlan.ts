@@ -68,3 +68,22 @@ export function regionsFor(moduleType: number): Region[] {
 }
 
 export const mhz = (f: number) => (f / 10).toFixed(1);
+
+/* 802.11ah (S1G) PHY rate, 1 spatial stream, long GI, in Mbps.
+   Rate = MCS0 rate of the bandwidth x the MCS multiplier; MCS10 is 1 MHz only,
+   MCS9 does not exist at 2 MHz. */
+const MCS0: { [bw: number]: number } = { 1: 0.3, 2: 0.65, 4: 1.35, 8: 2.925 };
+const MCS_MULT = [1, 2, 3, 4, 6, 8, 9, 10, 12, 40 / 3];
+
+export function halowRate(mcs: number, bw: number): number | null {
+  if (mcs === 10) return bw === 1 ? 0.15 : null;
+  if (!(mcs >= 0 && mcs <= 9) || !MCS0[bw] || (mcs === 9 && bw === 2)) return null;
+  return MCS0[bw] * MCS_MULT[mcs];
+}
+
+/** "6.5 Mbps (MCS 7)", "MCS 23" if the value is not a known MCS, '' if unknown (<0). */
+export function linkRateText(mcs: number, bw: number): string {
+  if (!(mcs >= 0)) return '';
+  const r = halowRate(mcs, bw);
+  return r === null ? 'MCS ' + mcs : (Math.round(r * 100) / 100) + ' Mbps (MCS ' + mcs + ')';
+}
