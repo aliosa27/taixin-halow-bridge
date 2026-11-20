@@ -1,7 +1,7 @@
 <script setup lang="ts">
   import { useI18n } from 'vue-i18n';
   import { Icon } from '@vicons/utils';
-  import { CodeOutlined, BugReportOutlined } from '@vicons/material';
+  import { CodeOutlined, BugReportOutlined, UpgradeOutlined } from '@vicons/material';
 
   const { t } = useI18n({
     inheritLocale: true,
@@ -35,6 +35,14 @@
       <p class="hint">{{t('license')}}</p>
     </section>
     <section class="card">
+      <h3><Icon><UpgradeOutlined /></Icon>{{t('updates')}}</h3>
+      <dl class="kv">
+        <dt>{{t('releases')}}</dt>
+        <dd><a :href="GH + REPO + '/releases'" target="_blank" rel="noopener">{{REPO}}/releases</a></dd>
+      </dl>
+      <p class="hint">{{t('updateHint')}}</p>
+    </section>
+    <section class="card">
       <h3><Icon><BugReportOutlined /></Icon>{{t('issues')}}</h3>
       <dl class="kv">
         <dt>GitHub</dt>
@@ -49,6 +57,10 @@
 
 <style scoped>
   .hint { margin: .8rem 0 0; font-size: .82em; color: var(--muted); }
+  /* links are long: label above, link below, left-aligned, wrapping inside the card */
+  .card { min-width: 0; }
+  .kv { grid-template-columns: 1fr; gap: .15rem; }
+  .kv dd { text-align: left; margin-bottom: .45rem; min-width: 0; overflow-wrap: anywhere; }
 </style>
 
 <i18n lang="json">
@@ -61,6 +73,9 @@
       "vendorFw": "Vendor SDK",
       "vendorUi": "Vendor web UI",
       "license": "Built from the Taixin SDK with patches; the web UI is derived from the vendor UI (Apache-2.0).",
+      "updates": "Firmware updates",
+      "releases": "Releases",
+      "updateHint": "New firmware is published on the releases page. Download the .bin file and install it on the Firmware page.",
       "issues": "Report an issue",
       "email": "Email",
       "issueHint": "Include the firmware version and build date from Status, and the UART log if the device misbehaves at boot."

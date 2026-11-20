@@ -1,5 +1,5 @@
 <script setup lang="ts">
-  import { ref, reactive, watch, onBeforeMount } from 'vue';
+  import { ref, reactive, watch, computed, onBeforeMount } from 'vue';
   import { useI18n } from 'vue-i18n';
   import { useDashboardStore, useFormDataStore } from '@/store';
   import { logoutIn3s } from '@/router';
@@ -26,6 +26,13 @@
   }
 
   const settingReactive = ref<deviceSettings>({} as deviceSettings);
+
+  // DHCP host name as sys_dhcp_hostname() (main.c) builds it: filtered name, '-', MAC bytes 3..5
+  const dhcpName = computed(() => {
+    const name = (settingReactive.value.hostname || '').replace(/[^A-Za-z0-9-]/g, '').replace(/^-+/, '') || 'tx';
+    const mac = (settingReactive.value.mac_addr || '').toLowerCase().split(':');
+    return name + '-' + (mac.length === 6 ? mac.slice(3).join('') : 'xxxxxx');
+  });
 
   onBeforeMount(async () => loadPageData(
     dashboardStore.authToken,
@@ -143,8 +150,14 @@
           <legend>{{t('deviceSettings')}}</legend>
           <div class="ctrl-group">
             <label for="hostname">{{t('hostname')}}</label>
-            <input type="text" id="hostname" v-model.trim="settingReactive.hostname" />
+            <input type="text" id="hostname" maxlength="7" v-model.trim="settingReactive.hostname" />
             <span class="msg-warn">{{showInputErrMsg.hostname}}</span>
+            <span class="msg-help">{{(settingReactive.hostname || '').length}} / 7 {{t('chars')}}</span>
+          </div>
+          <div class="ctrl-group">
+            <label for="dhcpname">{{t('dhcpName')}}</label>
+            <input type="text" id="dhcpname" :value="dhcpName" readonly />
+            <span class="msg-help">{{t('dhcpNameHelp')}}</span>
           </div>
           <div class="ctrl-group">
             <label for="macaddr">{{t('macAddr')}}</label>
@@ -177,6 +190,9 @@
         "reboot": "Reboot Device",
         "loadDef": "Load Factory Default",
         "hostname": "Device name",
+        "chars": "characters",
+        "dhcpName": "Network host name",
+        "dhcpNameHelp": "Sent to your DHCP server: the device name (letters, digits and '-') plus the last 6 hex digits of the MAC address.",
         "macAddr": "MAC address",
         "webpasswd": "Login password",
         "confirmLoadDef": "Are you sure to reset device?",
