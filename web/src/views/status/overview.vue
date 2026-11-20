@@ -25,7 +25,7 @@
   });
 
   const pollData = ['s_ipaddr', 's_netmask', 's_gw_ip', 'uptime', 'fwver', 'buildtime', 'mac_addr', 'dhcp_name',
-    'heap_free', 'heap_total', 'skb_free', 'skb_total', 'eth_state',
+    'heap_free', 'heap_total', 'skb_free', 'skb_total', 'fw_size', 'fw_max', 'eth_state',
     'dhcpc_en', 'wifi_mode', 'wifi_wnb', 'wifi_ssid', 'wifi_r_ssid', 'wifi_keymgmt'] as const;
 
   type poll = {
@@ -203,6 +203,11 @@
         <dt>{{t('skb')}}</dt>
         <dd>{{kb(statusPoll.skb_free)}} {{t('freeOf')}} {{kb(statusPoll.skb_total)}}</dd>
         <dd class="bar"><progress :value="pct(statusPoll.skb_free, statusPoll.skb_total)" max="100"></progress></dd>
+        <template v-if="statusPoll.fw_max && statusPoll.fw_max !== '0'">
+          <dt>{{t('flash')}}</dt>
+          <dd>{{kb(String(parseInt(statusPoll.fw_max) - parseInt(statusPoll.fw_size)))}} {{t('freeOf')}} {{kb(statusPoll.fw_max)}}</dd>
+          <dd class="bar"><progress :value="pct(String(parseInt(statusPoll.fw_max) - parseInt(statusPoll.fw_size)), statusPoll.fw_max)" max="100"></progress></dd>
+        </template>
       </dl>
       <p class="hint">{{t('memHint')}}</p>
     </section>
@@ -253,6 +258,7 @@
       "memory": "Memory",
       "heap": "System heap",
       "skb": "Packet buffers",
+      "flash": "Firmware slot",
       "freeOf": "free of",
       "memHint": "Bars show the share in use. Refreshes every 10 s."
     }
