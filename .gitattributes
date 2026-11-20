@@ -2,3 +2,5 @@
 patches/*.patch -text
 *.sh text eol=lf
 scripts/upstream.env text eol=lf
+releases/*.bin binary
+releases/*.json text eol=lf

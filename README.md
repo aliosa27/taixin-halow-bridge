@@ -42,12 +42,27 @@ git add -A patches && git commit
 
 CDK rewrites `txw4002a.mk`, `cdkws.mk`, `*.cdkws` and `*.modify.bat` on every open; the patched tree ignores them.
 
+## Releases and online update
+
+The firmware reports its version as `v2.4.1.3-43933 app-1 r<n>`: SDK version and build, the vendor's app version, and this project's release number `BRIDGE_RELEASE` (`TXW8301_WNB/project/project_config.h`). Released images live in `releases/`, and `releases/latest.json` names the current one. The Firmware page's **Check for updates** reads that file from GitHub in the browser (the device itself never goes online), downloads the image, checks its size and CRC-32, and uploads it to the device.
+
+To publish a release:
+
+1. Bump `BRIDGE_RELEASE`, commit in `TXW8301_WNB`, run `scripts/export-patches.sh`, commit `patches/`.
+2. Build in CDK and test the image on a device.
+3. `scripts/release.sh TXW8301_WNB/project/txw8301_v2.4.1.3-43933_app-1_<date>_.bin "What changed"`
+4. Commit `releases/` and push. Devices see it within about 5 minutes (GitHub's cache).
+
+On a link, update the station end before the AP.
+
 ## Changes from the vendor firmware
 
 - Web admin UI served from the device (`project/webui.c`): status, WiFi, radio, LAN, device management, firmware upload, AT console.
 - Radio page: pick region (US 902–928, EU 863–868, China 760–784, custom) and bandwidth; the 802.11ah channel list follows the plan and the module's tuning range.
 - WiFi page: WNB/standard mode selection, pairing button, raw 64-hex-digit PSK or passphrase.
-- Status: RSSI, link (RX) rate per peer, heap and packet-buffer usage, firmware build time.
+- Status: RSSI, link (RX) rate and traffic per peer, Ethernet link and counters, heap and packet-buffer usage, firmware build time, DHCP host name.
+- DHCP host name `<device name>-<last 3 MAC bytes>`; station IPs in the client list learned from ARP.
+- Online update from this repo's `releases/` (Firmware page).
 - DHCP client falls back to 192.168.123.1/24 after 60 s without a lease and keeps asking for one.
 - `AT+SYSCFG` and new `AT+SCAN?` reply through the AT channel; `AT+PING`/`AT+IPERF2` dropped to save ~6 KB of SRAM.
 

@@ -17,11 +17,9 @@ export function firmwareUpgrade(authToken: string, file: XMLHttpRequestBodyInit)
   var ret = {} as uploadCallback;
   xhr.open('POST', firmwareUploadPath);
   xhr.onreadystatechange = () => {
-    if (xhr.readyState === 4 && xhr.status === 200) {
-      ret.status(RET.OK);
-    } else if (xhr.status === 401) {
-      ret.status(RET.AUTH_FAIL);
-    }
+    if (xhr.readyState !== 4) return;
+    // 401 = token expired; anything else but 200 = image rejected (size, header, flash write)
+    ret.status(xhr.status === 200 ? RET.OK : xhr.status === 401 ? RET.AUTH_FAIL : RET.FAIL);
   }
   xhr.upload.onerror = () => {
     ret.progress(0);
