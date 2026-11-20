@@ -66,7 +66,9 @@ export async function connStat(authToken: string): Promise<connStatRet> {
       parseInt(stat[3]),
       stat.length > 6 ? parseInt(stat[4]) : -1,
       stat.length > 6 ? parseInt(stat[5]) : -1,
-      stat.length > 6 ? parseInt(stat[6]) : 0
+      stat.length > 6 ? parseInt(stat[6]) : 0,
+      stat.length > 8 ? parseInt(stat[7]) : -1,
+      stat.length > 8 ? parseInt(stat[8]) : -1
       );
   }
   return ret;
@@ -104,7 +106,9 @@ export async function stationList(authToken: string): Promise<stationListRet> {
         parseInt(staInfo[7]),
         staInfo.length > 10 ? parseInt(staInfo[8]) : -1,
         staInfo.length > 10 ? parseInt(staInfo[9]) : -1,
-        staInfo.length > 10 ? parseInt(staInfo[10]) : 0
+        staInfo.length > 10 ? parseInt(staInfo[10]) : 0,
+        staInfo.length > 12 ? parseInt(staInfo[11]) : -1,
+        staInfo.length > 12 ? parseInt(staInfo[12]) : -1
         );
     }
     // Do AID sort
@@ -225,7 +229,9 @@ export async function clientList(authToken: string) {
         staInfo.rssi,
         staInfo.txMcs,
         staInfo.rxMcs,
-        staInfo.bw
+        staInfo.bw,
+        staInfo.txKB,
+        staInfo.rxKB
         ));
     });
     // Merge dhcpClient

@@ -56,7 +56,10 @@ export class connStatClass {
   txMcs: number;   // firmware extension; -1 = unknown
   rxMcs: number;
   bw: number;      // BSS bandwidth, MHz
-  constructor(connected: boolean, rssi: number, evm: number, channel: number, txMcs = -1, rxMcs = -1, bw = 0) {
+  txKB: number;    // firmware extension: bytes to / from the AP, KiB; -1 = unknown
+  rxKB: number;
+  constructor(connected: boolean, rssi: number, evm: number, channel: number, txMcs = -1, rxMcs = -1, bw = 0,
+    txKB = -1, rxKB = -1) {
     this.connected = connected;
     this.rssi = rssi;
     this.evm = evm;
@@ -64,6 +67,8 @@ export class connStatClass {
     this.txMcs = txMcs;
     this.rxMcs = rxMcs;
     this.bw = bw;
+    this.txKB = txKB;
+    this.rxKB = rxKB;
   }
 }
 
@@ -79,13 +84,17 @@ export class staInfoClass {
   txMcs: number;   // firmware extension; -1 = unknown
   rxMcs: number;
   bw: number;
+  txKB: number;    // firmware extension: bytes to / from this station, KiB; -1 = unknown
+  rxKB: number;
   constructor(
     aid: number, ps: boolean, mac: string, ip: string, rssi: number, evm: number, tx_snr: number, rx_snr: number,
-    txMcs = -1, rxMcs = -1, bw = 0
+    txMcs = -1, rxMcs = -1, bw = 0, txKB = -1, rxKB = -1
     ) {
     this.txMcs = txMcs;
     this.rxMcs = rxMcs;
     this.bw = bw;
+    this.txKB = txKB;
+    this.rxKB = rxKB;
     this.aid = aid;
     this.ps = ps;
     this.mac = mac;
@@ -129,7 +138,10 @@ export class clientInfoClass {
   txMcs: number;
   rxMcs: number;
   bw: number;
-  constructor(type: 'Wired' | 'Wireless', mac: string, ip: string, signal: number, txMcs = -1, rxMcs = -1, bw = 0) {
+  txKB: number;
+  rxKB: number;
+  constructor(type: 'Wired' | 'Wireless', mac: string, ip: string, signal: number, txMcs = -1, rxMcs = -1, bw = 0,
+    txKB = -1, rxKB = -1) {
     this.type = type;
     this.mac = mac;
     this.ip = ip;
@@ -137,5 +149,7 @@ export class clientInfoClass {
     this.txMcs = txMcs;
     this.rxMcs = rxMcs;
     this.bw = bw;
+    this.txKB = txKB;
+    this.rxKB = rxKB;
   }
 }

@@ -2,7 +2,7 @@
   import { ref, computed, reactive, onBeforeMount, onUnmounted } from 'vue';
   import { useI18n } from 'vue-i18n';
   import { getSettings, connStat, RET, type connStatClass } from '@/wnbCom';
-  import { WIFI_MODE, KEY_MGMT, SELECT, wifiModeKey } from '@/utils';
+  import { WIFI_MODE, KEY_MGMT, SELECT, wifiModeKey, sizeFromKB } from '@/utils';
   import { linkRateText } from '@/utils/halowPlan';
   import { useDashboardStore } from '@/store';
   import { logoutIn3s } from '@/router';
@@ -12,7 +12,8 @@
     RouterOutlined,
     SettingsEthernetOutlined,
     WifiOutlined,
-    MemoryOutlined
+    MemoryOutlined,
+    LanOutlined
   } from '@vicons/material';
 
   const { t } = useI18n({
@@ -24,7 +25,7 @@
   });
 
   const pollData = ['s_ipaddr', 's_netmask', 's_gw_ip', 'uptime', 'fwver', 'buildtime', 'mac_addr',
-    'heap_free', 'heap_total', 'skb_free', 'skb_total',
+    'heap_free', 'heap_total', 'skb_free', 'skb_total', 'eth_state',
     'dhcpc_en', 'wifi_mode', 'wifi_wnb', 'wifi_ssid', 'wifi_r_ssid', 'wifi_keymgmt'] as const;
 
   type poll = {
@@ -115,11 +116,17 @@
   }
   const showMem = computed(() => !!statusPoll.heap_total && statusPoll.heap_total !== '0');
 
-  // Station side: PHY rate both ways (firmware extension in conn_state)
-  const linkRate = computed(() => {
-    const tx = linkRateText(connStatDisplay.txMcs, connStatDisplay.bw);
-    const rx = linkRateText(connStatDisplay.rxMcs, connStatDisplay.bw);
-    return tx || rx ? 'TX ' + (tx || '–') + ' · RX ' + (rx || '–') : '';
+  // Station side: PHY rate of frames received from the AP (firmware extension in conn_state).
+  // TX is not shown: the lmac has no per-station TX MCS (LMAC_IOCTL_GET_STA_TX_MCS unimplemented), it reads 0.
+  const linkRate = computed(() => linkRateText(connStatDisplay.rxMcs, connStatDisplay.bw));
+  const wifiTraffic = computed(() => connStatDisplay.txKB >= 0
+    ? 'TX ' + sizeFromKB(connStatDisplay.txKB) + ' · RX ' + sizeFromKB(connStatDisplay.rxKB) : '');
+
+  // Ethernet port (firmware extension eth_state): "link,speed,duplex,tx,rx,rx_err,rx_ovf", counts are frames
+  const eth = computed(() => {
+    const f = (statusPoll.eth_state || '').split(',').map(Number);
+    if (f.length < 7 || f.some(isNaN)) return null;
+    return { up: f[0] === 1, speed: f[1], full: f[2] === 1, tx: f[3], rx: f[4], err: f[5], ovf: f[6] };
   });
 
   const signalStrength = computed(() => {
@@ -149,7 +156,21 @@
           <template v-if="linkRate">
             <dt>{{t('linkRate')}}</dt><dd>{{linkRate}}</dd>
           </template>
+          <template v-if="wifiTraffic">
+            <dt>{{t('traffic')}}</dt><dd>{{wifiTraffic}}</dd>
+          </template>
         </template>
+      </dl>
+    </section>
+    <section class="card" v-if="eth">
+      <h3><Icon><LanOutlined /></Icon>{{t('ethernet')}}</h3>
+      <dl class="kv">
+        <dt>{{t('state')}}</dt><dd><span class="chip" :class="{ ok: eth.up }">{{eth.up ? t('ethUp') : t('ethDown')}}</span></dd>
+        <template v-if="eth.up">
+          <dt>{{t('speed')}}</dt><dd>{{eth.speed}} Mbps {{eth.full ? t('full') : t('half')}}</dd>
+        </template>
+        <dt>{{t('frames')}}</dt><dd>TX {{eth.tx}} · RX {{eth.rx}}</dd>
+        <dt>{{t('errors')}}</dt><dd>{{eth.err}} RX · {{eth.ovf}} {{t('overflow')}}</dd>
       </dl>
     </section>
     <section class="card">
@@ -214,7 +235,17 @@
       "hasClients": "Stations connected",
       "noClients": "No stations",
       "signal": "Signal",
-      "linkRate": "Link rate",
+      "linkRate": "RX rate",
+      "traffic": "Traffic",
+      "ethernet": "Ethernet",
+      "ethUp": "Up",
+      "ethDown": "No cable",
+      "speed": "Speed",
+      "full": "full duplex",
+      "half": "half duplex",
+      "frames": "Frames",
+      "errors": "Errors",
+      "overflow": "overflow",
       "memory": "Memory",
       "heap": "System heap",
       "skb": "Packet buffers",

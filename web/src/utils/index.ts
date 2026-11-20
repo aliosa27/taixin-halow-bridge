@@ -284,3 +284,12 @@ export const inputValidate = {
 export function encodeSvg(svg: string): string {
     return svg.replace(/</g, '%3C').replace(/>/g, '%3E').replace(/"/g, "'").replace(/#/g, '%23');
 }
+/**
+ * KiB count from the firmware -> "512 KB", "12.3 MB", "1.25 GB"; '' if unknown (< 0)
+ */
+export function sizeFromKB(kb: number): string {
+  if (!(kb >= 0)) return '';
+  if (kb < 1024) return kb + ' KB';
+  if (kb < 1048576) return (kb / 1024).toFixed(1) + ' MB';
+  return (kb / 1048576).toFixed(2) + ' GB';
+}
