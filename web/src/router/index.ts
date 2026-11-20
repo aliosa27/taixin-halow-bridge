@@ -12,6 +12,7 @@ import wifiAdvancedVue from '@/views/WiFi/wifiAdvanced.vue';
 import deviceManageVue from '@/views/device/deviceManage.vue';
 import deviceUpgradeVue from '@/views/device/deviceUpgrade.vue';
 import debugVue from '@/views/debug.vue';
+import aboutVue from '@/views/about.vue';
 //import setupHelperVue from '@/views/setupHelper/setupHelper.vue';
 //import modeSelectVue from '@/views/setupHelper/modeSelect.vue';
 //import configDeviceVue from '@/views/setupHelper/configDevice.vue';
@@ -85,6 +86,10 @@ const routes: Readonly<RouteRecordRaw[]> = [{
     path: 'debug',
     name: 'Debug',
     component: debugVue
+  }, {
+    path: 'about',
+    name: 'About',
+    component: aboutVue
   }]
 }, {
   path: '/login',

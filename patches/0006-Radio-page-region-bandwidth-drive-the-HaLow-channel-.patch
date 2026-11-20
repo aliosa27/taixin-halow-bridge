@@ -1,7 +1,7 @@
 From 43991854744731ed1680a5bdd1309d9fb74d1564 Mon Sep 17 00:00:00 2001
 From: aliosa27 <aliosa27@aliosa27.me>
 Date: Wed, 18 Nov 2026 20:26:02 -0800
-Subject: [PATCH 06/12] Radio page: region + bandwidth drive the HaLow channel
+Subject: [PATCH 06/13] Radio page: region + bandwidth drive the HaLow channel
  list
 
 - webui.c: wifi_chan_list writable again (each freq checked with

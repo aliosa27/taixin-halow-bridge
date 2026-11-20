@@ -16,6 +16,7 @@
     SettingsApplicationsOutlined,
     UpgradeOutlined,
     BugReportOutlined,
+    InfoOutlined,
     LogOutOutlined
   } from '@vicons/material';
 
@@ -96,6 +97,12 @@
             {{t('Debug')}}
           </RouterLink>
         </li>
+        <li class="menu-item">
+          <RouterLink class="menu-link" :to="{ name: 'About' }">
+            <Icon><InfoOutlined /></Icon>
+            {{t('About')}}
+          </RouterLink>
+        </li>
         <li class="menu-item menu-foot" v-if="!dashboardStore.deviceConfig.noWebAuth">
           <button type="button" @click="popConfirmLogout = true">
             <Icon><LogOutOutlined /></Icon>
@@ -121,6 +128,7 @@
       "DeviceManagement": "Management",
       "DeviceUpgrade": "Firmware",
       "Debug": "Debug",
+      "About": "About",
       "Logout": "Log out",
       "confirmLogout": "Log out of the device?"
     }
