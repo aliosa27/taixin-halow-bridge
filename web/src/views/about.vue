@@ -57,9 +57,10 @@
 
 <style scoped>
   .hint { margin: .8rem 0 0; font-size: .82em; color: var(--muted); }
-  /* links are long: label above, link below, left-aligned */
+  /* links are long: label above, link below, left-aligned, wrapping inside the card */
+  .card { min-width: 0; }
   .kv { grid-template-columns: 1fr; gap: .15rem; }
-  .kv dd { text-align: left; margin-bottom: .45rem; }
+  .kv dd { text-align: left; margin-bottom: .45rem; min-width: 0; overflow-wrap: anywhere; }
 </style>
 
 <i18n lang="json">

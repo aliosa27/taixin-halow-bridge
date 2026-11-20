@@ -1,7 +1,7 @@
 From 6bb7805f5dbec5becc7596c5d5c9659f7bdcdfeb Mon Sep 17 00:00:00 2001
 From: aliosa27 <aliosa27@aliosa27.me>
 Date: Wed, 18 Nov 2026 08:26:45 -0800
-Subject: [PATCH 01/18] Web admin UI served by the firmware (webui.c)
+Subject: [PATCH 01/19] Web admin UI served by the firmware (webui.c)
 
 Embeds a modified hgic-wnb-web build (project/webui_page.h) and implements
 its protocol on top of sys_cfgs. Web password lives in its own syscfg
