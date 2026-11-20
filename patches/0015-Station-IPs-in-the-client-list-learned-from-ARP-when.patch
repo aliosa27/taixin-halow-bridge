@@ -1,0 +1,116 @@
+From 73aabbf6119824864b6968c3ec9481102d680268 Mon Sep 17 00:00:00 2001
+From: aliosa27 <aliosa27@aliosa27.me>
+Date: Fri, 20 Nov 2026 10:20:59 -0800
+Subject: [PATCH 15/15] Station IPs in the client list learned from ARP when
+ the AP has no DHCP lease
+
+---
+ NOTES.md                                |  1 +
+ project/webui.c                         | 53 +++++++++++++++++++++++++
+ sdk/lib/net/lwip/src/netif/ethernetif.c |  7 ++++
+ 3 files changed, 61 insertions(+)
+
+diff --git a/NOTES.md b/NOTES.md
+index 7526658..82229e5 100644
+--- a/NOTES.md
++++ b/NOTES.md
+@@ -36,6 +36,7 @@ Taixin TXW8301 (TXW4002A, C-SKY CK803) HaLow wireless-bridge (WNB) firmware SDK
+ - Writes are staged, validated, committed, and applied after the response is sent (`webui_run_todo`). To add a setting, add it to `webui_get_value()` and `webui_set_value()`. Read-only status keys: `fwver`, `buildtime` (`__DATE__ __TIME__` of `webui.c`, which `prebuild.sh` forces to recompile on every build), `uptime`, `s_ipaddr`/`s_netmask`/`s_gw_ip` (live w0), `heap_free`/`heap_total` (`sram_heap`), `skb_free`/`skb_total` (WiFi packet-buffer pool), all in bytes; `pair_state` (bit0 started from the web and not stopped, kept in `webui.c`; bit1 `sys_status.pair_success`, set by `events.c`); `eth_state` (`"link,speed,duplex,tx,rx,rx_err,rx_ovf"`, read straight from the `gmac` driver struct in `device.c`, `struct hg_gmac_eva` in `hg_gmac_eva.h`; the counters are frames, the driver keeps no byte counts, and the Ethernet port is bridged, not an lwIP netif, so lwIP stats do not see it either; only with `GMAC_ENABLE`).
+ - WiFi key: an empty `sys_cfgs.passwd` means the raw `psk` is the key (set by `wifi_passwd=<64 hex>`, `AT+PSK`, or a successful pairing on a station, which all clear `passwd`). Then `wifi_passwd=?` returns the PSK as 64 hex digits, and an SSID change keeps the key instead of re-deriving it (as the vendor `AT+SSID` does). A passphrase is limited to 32 characters by `passwd[PASSWD_MAX_LEN+1]`.
+ - DHCP host name: the DHCP client on `w0` sends option 12 as `<devname>-<last 3 MAC bytes in hex>` (e.g. `tx-a16898`; devname is the web UI "Device name", default `tx`, filtered to `[A-Za-z0-9-]`). `sys_dhcp_hostname()` in `main.c` builds it; the `LWIP_HOOK_DHCP_APPEND_OPTIONS` hook defined at the top of lwIP `dhcp.c` appends it to DISCOVER, REQUEST and INFORM. This avoids `LWIP_NETIF_HOSTNAME`, which would change `struct netif` (shared with the closed libs); lwIP's own option also skips DISCOVER. Read-only web key `dhcp_name`, shown on Status → Network. A changed device name is sent from the next DHCP request on (renewal or reboot).
++- Station IPs in `stalist`: the AP's own DHCP lease (`dhcpd_get_lease_ip`) if there is one, else a 16-entry MAC→IP table learned from ARP frames reaching the stack (`sys_netif_rx_snoop` in `webui.c`, called from `lwip_netif_hook_inputdata` in lwIP `ethernetif.c`, weak no-op there). In a bridge the LAN router hands out addresses, so the lease is usually missing. All LAN hosts go in and the oldest entry is replaced. A station's `w0` MAC equals its radio MAC, so the lookup by the stalist MAC works (verified on hardware 2026-11-20).
+ - Default web password is `admin` (`WEBUI_DEFAULT_PASSWD`), stored in the `webcfg` region.
+ - UI source: `../web` in the taixin-halow-bridge repo (Vue 3 + Vite, modified from the vendor's version). Its `AGENTS.md` is outdated: vue-i18n, vue-router and @vicons/utils were replaced by small stand-ins in `src/lite/`, mapped through aliases in `vite.config.ts` **and** `tsconfig.json`. The UI is English-only; a Vite plugin keeps only `enUS` from each SFC `<i18n>` block.
+ - The stand-ins support only what the UI uses today (named routes, `t('key')` with no interpolation). Extend them rather than re-adding the real libraries.
+diff --git a/project/webui.c b/project/webui.c
+index 089ad2c..2a432fb 100644
+--- a/project/webui.c
++++ b/project/webui.c
+@@ -1208,6 +1208,56 @@ struct webui_peer {
+     uint32 txk, rxk;
+ };
+ 
++/* IPs learned from ARP: the sender MAC/IP of every ARP frame that reaches the stack (sys_netif_rx_snoop, called
++ * from lwIP ethernetif.c). In a bridge the LAN router hands out addresses, so the AP's DHCP server has no lease
++ * for a station; stalist then uses this table. Stations announce their address with a gratuitous ARP when they
++ * get it, and ARP again for their gateway. All LAN hosts go in and the oldest entry is replaced, so on a busy LAN
++ * a quiet station can drop out until it ARPs again. */
++#define WEBUI_ARP_MAX 16
++static struct {
++    uint8  mac[6];
++    uint32 ip;                                   /* network byte order */
++    uint32 seen;                                 /* jiffies */
++} webui_arp[WEBUI_ARP_MAX];
++
++void sys_netif_rx_snoop(const uint8 *d, uint32 len)
++{
++    uint32 i, slot = 0, ip;
++
++    /* Ethernet + ARP for IPv4 over Ethernet, sender MAC equal to the frame source (no proxy ARP) */
++    if (len < 42 || d[12] != 0x08 || d[13] != 0x06 || d[16] != 0x08 || d[17] != 0x00 || d[18] != 6 || d[19] != 4 ||
++        os_memcmp(d + 6, d + 22, 6)) {
++        return;
++    }
++    os_memcpy(&ip, d + 28, 4);
++    if (ip == 0) {                                /* ARP probe: no address yet */
++        return;
++    }
++    for (i = 0; i < WEBUI_ARP_MAX; i++) {
++        if (os_memcmp(webui_arp[i].mac, d + 22, 6) == 0) {
++            slot = i;
++            break;
++        }
++        if (webui_arp[i].seen < webui_arp[slot].seen) {
++            slot = i;
++        }
++    }
++    os_memcpy(webui_arp[slot].mac, d + 22, 6);
++    webui_arp[slot].ip   = ip;
++    webui_arp[slot].seen = (uint32)os_jiffies() | 1;   /* never 0, which marks a free entry */
++}
++
++static uint32 webui_arp_ip(const uint8 *mac)
++{
++    uint32 i;
++    for (i = 0; i < WEBUI_ARP_MAX; i++) {
++        if (webui_arp[i].seen && os_memcmp(webui_arp[i].mac, mac, 6) == 0) {
++            return webui_arp[i].ip;
++        }
++    }
++    return 0;
++}
++
+ static void webui_peer_info(int32 ifidx, uint16 aid, uint8 *mac, struct webui_peer *p)
+ {
+     struct ieee80211_stainfo si;
+@@ -1272,6 +1322,9 @@ static void webui_cmd_stalist(int32 s)
+ #if SYS_APP_DHCPD
+         ip = dhcpd_get_lease_ip(list[i].addr);
+ #endif
++        if (ip == 0) {
++            ip = webui_arp_ip(list[i].addr);
++        }
+         webui_peer_info(ap, list[i].aid, list[i].addr, &p);
+         sb_printf(&sb, "%s%u%c%u%c" MACSTR "%c" IPSTR "%c%d%c%d%c%d%c%d%c%d%c%d%c%d%c%u%c%u",
+                   i ? "\x1d" : "",
+diff --git a/sdk/lib/net/lwip/src/netif/ethernetif.c b/sdk/lib/net/lwip/src/netif/ethernetif.c
+index aad0574..ee1c31a 100644
+--- a/sdk/lib/net/lwip/src/netif/ethernetif.c
++++ b/sdk/lib/net/lwip/src/netif/ethernetif.c
+@@ -617,9 +617,16 @@ uint8 *lwip_netif_get_mac2(const char *name)
+     return nif ? nif->hwaddr : NULL;
+ }
+ 
++/* Firmware extension: every frame that reaches the stack passes here (from ethernet_input), so project code can
++ * learn from it, e.g. station IPs from ARP (project/webui.c). Must not keep or change the frame. */
++__weak void sys_netif_rx_snoop(const uint8 *data, uint32 len)
++{
++}
++
+ int32 lwip_netif_hook_inputdata(struct netif *nif, uint8 *data, uint32 len)
+ {
+     struct ethernetif *ethernetif = (struct ethernetif *)nif->state;
++    sys_netif_rx_snoop(data, len);
+     return netdev_hook_inputdata(ethernetif->ndev, (uint32)data, len);
+ }
+ 
