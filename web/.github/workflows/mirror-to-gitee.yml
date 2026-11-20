@@ -1,0 +1,72 @@
+name: Mirror to Gitee
+
+on:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mirror-to-gitee
+  cancel-in-progress: true
+
+jobs:
+  mirror:
+    name: Sync branches and tags
+    if: github.repository == 'Taixin-Semiconductor/hgic-wnb-web'
+    runs-on: ubuntu-latest
+
+    env:
+      GITEE_REPOSITORY: git@gitee.com:zhuhai-taixin-semiconductor_1/hgic-wnb-web.git
+
+    steps:
+      - name: Configure Gitee SSH access
+        env:
+          GITEE_SSH_PRIVATE_KEY: ${{ secrets.GITEE_SSH_PRIVATE_KEY }}
+          GITEE_KNOWN_HOSTS: ${{ secrets.GITEE_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+
+          if [[ -z "${GITEE_SSH_PRIVATE_KEY:-}" ]]; then
+            echo "::error::The GITEE_SSH_PRIVATE_KEY repository secret is not configured."
+            exit 1
+          fi
+
+          if [[ -z "${GITEE_KNOWN_HOSTS:-}" ]]; then
+            echo "::error::The GITEE_KNOWN_HOSTS repository secret is not configured."
+            exit 1
+          fi
+
+          install -d -m 700 "$HOME/.ssh"
+          printf '%s\n' "$GITEE_SSH_PRIVATE_KEY" | tr -d '\r' > "$HOME/.ssh/gitee_mirror"
+          printf '%s\n' "$GITEE_KNOWN_HOSTS" | tr -d '\r' > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/gitee_mirror" "$HOME/.ssh/known_hosts"
+
+      - name: Mirror GitHub branches and tags to Gitee
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          mirror_dir="$RUNNER_TEMP/gitee-mirror.git"
+          github_repository="https://github.com/${GITHUB_REPOSITORY}.git"
+          github_auth="$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w 0)"
+
+          git init --bare "$mirror_dir"
+          git \
+            -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $github_auth" \
+            -C "$mirror_dir" \
+            fetch --force --prune "$github_repository" \
+            '+refs/heads/*:refs/heads/*' \
+            '+refs/tags/*:refs/tags/*'
+
+          export GIT_SSH_COMMAND="ssh -i $HOME/.ssh/gitee_mirror -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$HOME/.ssh/known_hosts"
+
+          git -C "$mirror_dir" push --force --prune "$GITEE_REPOSITORY" \
+            'refs/heads/*:refs/heads/*' \
+            'refs/tags/*:refs/tags/*'
+
+      - name: Remove Gitee SSH credentials
+        if: always()
+        run: rm -f "$HOME/.ssh/gitee_mirror" "$HOME/.ssh/known_hosts"

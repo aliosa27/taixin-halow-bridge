@@ -1,0 +1,17 @@
+{
+  "enUS": {
+    "invalidInput": "Invalid value",
+    "emptyInput": "Required",
+    "authTMout": "Session expired. Returning to the login page…",
+    "pageLoadErr": "Could not load data from the device. Please refresh the page.",
+    "applySuccess": "Settings applied.",
+    "applyFail": "The device rejected the settings.",
+    "enable": "Enabled",
+    "disable": "Disabled",
+    "wifiModeAP": "Access Point",
+    "wifiModeSTA": "Station",
+    "wifiModeAPSTA": "Repeater",
+    "wifiModeWNBAP": "WNB Access Point",
+    "wifiModeWNBSTA": "WNB Station"
+  }
+}
