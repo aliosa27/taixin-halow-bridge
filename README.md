@@ -13,6 +13,16 @@ This repository does not contain the vendor SDK. It holds:
 
 Ready-built firmware is on the [releases page](https://github.com/aliosa27/taixin-halow-bridge/releases).
 
+## Tested hardware
+
+This firmware has been tested on:
+
+- [LILYGO T-Halow](https://lilygo.cc/products/t-halow)
+- [LILYGO T-Halow RJ45](https://lilygo.cc/products/t-halow-rj45)
+- Most Taixin TXW8301 HaLow Ethernet bridges
+- [Anjielo HaLow Ethernet bridge kit](https://anjielo.com/products/wireless-signal-wall-through-ethernet-air-connector-port-bridge-kit-outdoor-long-distance-up-to-1000-meters-transmitter-receiver?variant=43940661362905)
+- [Anjielo HaLow Wi-Fi extender](https://anjielo.com/products/anjielosmart-ah-wifi-halow-extender-long-distance-wi-fi-outdoor-ap-extender-powerful-high-gain-2-4-5g-antenna-wifi-range-extender-amplifier). This firmware has not been tested on its receiver unit (the side with the 2.4/5 GHz Wi-Fi access point). That unit, on its stock firmware, connects to a device running this firmware in WNB Access Point mode.
+
 ## Flashing
 
 Use the `.bin` from a release, or your own `project/txw8301_v<ver>-<svn>_<date>_.bin` (the makecode output). Plain `txw8301.bin` has no OTA header and is rejected. Images are limited to 496 KB (`0x7C000`).

@@ -58,8 +58,9 @@ export class connStatClass {
   bw: number;      // BSS bandwidth, MHz
   txKB: number;    // firmware extension: bytes to / from the AP, KiB; -1 = unknown
   rxKB: number;
+  staCnt: number;  // firmware extension: stations associated to our AP; -1 = not an AP / unknown
   constructor(connected: boolean, rssi: number, evm: number, channel: number, txMcs = -1, rxMcs = -1, bw = 0,
-    txKB = -1, rxKB = -1) {
+    txKB = -1, rxKB = -1, staCnt = -1) {
     this.connected = connected;
     this.rssi = rssi;
     this.evm = evm;
@@ -69,6 +70,7 @@ export class connStatClass {
     this.bw = bw;
     this.txKB = txKB;
     this.rxKB = rxKB;
+    this.staCnt = staCnt;
   }
 }
 

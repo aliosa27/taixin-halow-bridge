@@ -68,7 +68,8 @@ export async function connStat(authToken: string): Promise<connStatRet> {
       stat.length > 6 ? parseInt(stat[5]) : -1,
       stat.length > 6 ? parseInt(stat[6]) : 0,
       stat.length > 8 ? parseInt(stat[7]) : -1,
-      stat.length > 8 ? parseInt(stat[8]) : -1
+      stat.length > 8 ? parseInt(stat[8]) : -1,
+      stat.length > 9 ? parseInt(stat[9]) : -1
       );
   }
   return ret;

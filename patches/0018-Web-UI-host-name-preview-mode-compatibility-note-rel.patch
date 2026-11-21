@@ -1,7 +1,7 @@
 From d0c0ffb176fa06c3266635611b4c9903469e026d Mon Sep 17 00:00:00 2001
 From: aliosa27 <aliosa27@aliosa27.me>
 Date: Fri, 20 Nov 2026 15:39:12 -0800
-Subject: [PATCH 18/23] Web UI: host name preview, mode compatibility note,
+Subject: [PATCH 18/24] Web UI: host name preview, mode compatibility note,
  releases link on About
 
 ---

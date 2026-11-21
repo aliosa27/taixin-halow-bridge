@@ -129,6 +129,14 @@
     return { up: f[0] === 1, speed: f[1], full: f[2] === 1, tx: f[3], rx: f[4], err: f[5], ovf: f[6] };
   });
 
+  // Frame counters run into the millions; keep them short so the row fits the card: 429634 -> 430k, 2058712 -> 2.06M
+  function count(n: number): string {
+    if (n < 10000) return String(n);
+    if (n < 1e6) return Math.round(n / 1e3) + 'k';
+    if (n < 1e9) return (n / 1e6).toFixed(n < 1e8 ? 2 : 0) + 'M';
+    return (n / 1e9).toFixed(2) + 'G';
+  }
+
   const signalStrength = computed(() => {
     return Math.min(Math.max(2 * (connStatDisplay.rssi + 100), 0), 100);
   });
@@ -142,6 +150,9 @@
       <dl class="kv">
         <dt>{{t('opMode')}}</dt><dd>{{wifiOpmode}}</dd>
         <dt>{{t('state')}}</dt><dd><span class="chip" :class="{ ok: connStatDisplay.connected }">{{connLabel}}</span></dd>
+        <template v-if="connStatDisplay.staCnt >= 0">
+          <dt>{{t('stations')}}</dt><dd>{{connStatDisplay.staCnt}}</dd>
+        </template>
         <dt>SSID</dt><dd>{{statusPoll.wifi_ssid}}</dd>
         <template v-if="statusPoll.wifi_mode === WIFI_MODE.APSTA">
           <dt>{{t('rssid')}}</dt><dd>{{statusPoll.wifi_r_ssid}}</dd>
@@ -169,7 +180,7 @@
         <template v-if="eth.up">
           <dt>{{t('speed')}}</dt><dd>{{eth.speed}} Mbps {{eth.full ? t('full') : t('half')}}</dd>
         </template>
-        <dt>{{t('frames')}}</dt><dd>TX {{eth.tx}} · RX {{eth.rx}}</dd>
+        <dt>{{t('frames')}}</dt><dd :title="'TX ' + eth.tx + ' · RX ' + eth.rx">TX {{count(eth.tx)}} · RX {{count(eth.rx)}}</dd>
         <dt>{{t('errors')}}</dt><dd>{{eth.err}} RX · {{eth.ovf}} {{t('overflow')}}</dd>
       </dl>
     </section>
@@ -243,6 +254,7 @@
       "disconnected": "Not connected",
       "hasClients": "Stations connected",
       "noClients": "No stations",
+      "stations": "Stations",
       "signal": "Signal",
       "linkRate": "RX rate",
       "traffic": "Traffic",
