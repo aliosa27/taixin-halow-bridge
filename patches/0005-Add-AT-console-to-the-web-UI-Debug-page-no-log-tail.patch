@@ -1,7 +1,7 @@
 From adfeb48e157aebcc3f1441f58db69b6aa30f64f5 Mon Sep 17 00:00:00 2001
 From: aliosa27 <aliosa27@aliosa27.me>
 Date: Wed, 18 Nov 2026 20:11:06 -0800
-Subject: [PATCH 05/22] Add AT console to the web UI (Debug page, no log tail)
+Subject: [PATCH 05/23] Add AT console to the web UI (Debug page, no log tail)
 
 - webui.c: "atcmd=<AT...>" runs a command through libatcmd with
   atcmd_output_hdl() capturing atcmd_printf() output; waits up to 4 s

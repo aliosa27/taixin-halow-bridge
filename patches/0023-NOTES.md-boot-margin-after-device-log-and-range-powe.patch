@@ -1,0 +1,48 @@
+From 92df40db19c1456868a33ddb904b22d256880f77 Mon Sep 17 00:00:00 2001
+From: aliosa27 <aliosa27@aliosa27.me>
+Date: Fri, 20 Nov 2026 21:10:17 -0800
+Subject: [PATCH 23/23] NOTES.md: boot margin after device log and range/power,
+ page size, heap investigation
+
+---
+ NOTES.md | 12 ++++++++++--
+ 1 file changed, 10 insertions(+), 2 deletions(-)
+
+diff --git a/NOTES.md b/NOTES.md
+index 67a16bc..3ea1349 100644
+--- a/NOTES.md
++++ b/NOTES.md
+@@ -44,7 +44,7 @@ Taixin TXW8301 (TXW4002A, C-SKY CK803) HaLow wireless-bridge (WNB) firmware SDK
+   1. `npm run build` in `../web` (runs `vue-tsc`).
+   2. `powershell -ExecutionPolicy Bypass -File project\utilities\gen_webui_page.ps1` (regenerates `project/webui_page.h`; `-Placeholder` writes a stub page).
+   3. Rebuild the firmware.
+-  4. Check the gzip size reported by step 2. It is 56,502 bytes on `main` (2026-11-20); it costs the same amount of SRAM and counts against the OTA limit. Also check `__heap_start` in `project.map` against the table under Parked ideas.
++  4. Check the gzip size reported by step 2. It is 58,126 bytes on `main` (2026-11-20, after the device log and Range and power); it costs the same amount of SRAM and counts against the OTA limit. Also check `__heap_start` in `project.map` against the table under Parked ideas.
+ - The UI was written for 2.4 GHz chips. The hostname is limited to 7 characters (`devname[8]`). The Device page enforces that (`maxlength`, counter) and shows a read-only preview of the DHCP host name; the preview repeats the rules of `sys_dhcp_hostname()`, so change both together.
+ - Mode wording (WiFi page, `wifiBasic.vue`): the standard AP/Station modes only link Taixin devices on 2.x firmware for now; the WNB modes also connect to devices on legacy 1.6x firmware. The About page links the GitHub releases page.
+ - Layout: `.kv` key/value lists in `.card`s (`src/assets/style.css`) keep values on one line and let the card grow; the e2e test checks that the MAC on Status stays on one line. Pages with long values (About) set wrapping in their own scoped style.
+@@ -58,6 +58,13 @@ Taixin TXW8301 (TXW4002A, C-SKY CK803) HaLow wireless-bridge (WNB) firmware SDK
+   - A station only searches the listed frequencies.
+ - WiFi modes: `WIFI_WNBAP_SUPPORT` and `WIFI_WNBSTA_SUPPORT` are 1 in `project_config.h`. WNB is Taixin's own bridge protocol; a WNB AP only accepts WNB stations, and the WNB STA has roaming enabled. The UI sends the side as `wifi_mode` (1 STA, 2 AP, 3 repeater) and the type as `wifi_wnb` (0 standard, 1 WNB), a firmware extension. `webui.c` merges the two (`webui_mode_make`). A saved mode change reboots the device, because the interfaces, ACS, the DHCP server and the role pin are only set up at boot. `device_cfg` has a 10th field, `wnbEn`. Extensions to the vendor replies: `conn_state` adds tx MCS, rx MCS (station side, towards the AP; -1 otherwise), `bss_bw`, tx KiB and rx KiB; each `stalist` entry adds tx MCS, rx MCS, `bss_bw`, tx KiB and rx KiB (`ieee80211_conf_get_stainfo`, `webui_peer_info`). Whether the umac fills `tx_bytes`/`rx_bytes` was not verified on hardware yet. The UI converts MCS 0–10 + bandwidth to a PHY rate (`linkRateText` in `halowPlan.ts`, 1 SS, long GI) and shows only the RX rate. The TX MCS always reads 0 on hardware: the closed lmac does not implement `LMAC_IOCTL_GET_STA_TX_MCS` (it falls through to the default case of the `lmac_get_cfg` jump table), so no per-station TX rate is available. An unexpected RX value is shown as a raw `MCS n`. Repeater needs `WIFI_REPEATER_SUPPORT=1`, which changes `struct sys_config`, so all upgraded devices reset to defaults. It is not enabled.
+ 
++## Heap (open, 2026-11-20)
++
++- Status on hardware: system heap ~8 KB free of 60 KB when idle; after a Device log session it stayed at ~1.5 KB. Packet buffers (SKB pool) 86.8 of 96.5 KB free, so the SKB pool has room to give.
++- Split (`sys_config.h`): `SYS_HEAP_SIZE` 60 KB (`#ifndef`, can be overridden in `project_config.h`), `WIFI_RX_BUFF_SIZE` 64 KB, SKB pool = the rest up to `__heap_end` 0x200b0000 (`skbpool_init` in `main.c`). Moving heap from the SKB pool is the likely fix, but the boot failures (see Parked ideas) may come from a minimum SKB pool size (~98 KB), so test e.g. `SYS_HEAP_SIZE (64*1024)` on its own and watch boot.
++- Ruled out in `webui.c`: request/reply buffers are freed on every path; the log tail uses a static ring. lwIP PCBs come from static memp pools. `sys_dbginfo_print`/`AT+SYSDBG heap 1` print from the stack.
++- Remaining suspects: `g_at_buf` (2 KB, `WEBUI_AT_BUF`) is allocated on the first web AT command and never freed, by design so far; lwIP send data (`TCP_SND_BUF` 4×1460, from the heap via `MEM_LIBC_MALLOC=1`) held by connections still retransmitting after 1 s polling over WiFi; allocations in the closed libs. Next step: check whether heap recovers after a few idle minutes, and capture one `AT+SYSDBG heap 1` dump through the Device log (it lists allocations by function and line).
++
+ ## Parked ideas (each broke boot; all reverted)
+ 
+ When these were parked, the known-good page was 49,693 bytes (gzip). Two builds failed to boot:
+@@ -72,8 +79,9 @@ Measured from `project.map` ("Total ROM Size", and `__heap_start`, where the poo
+ | Debug page + editable channel list, 2026-11-18 | 461,536 | 0x20079210 | no |
+ | AT console, without ping/iperf, 2026-11-18 | 456,368 | 0x20076a2c | yes |
+ | `main` with free flash, host name preview, About releases link, 2026-11-20 (raw image 462,680, page 56.5 KB) | | 0x200785ec | yes |
++| `main` with device log (NETLOG/NETAT off) and Range and power, 2026-11-20 (page 58.1 KB) | | 0x20078e08 | yes |
+ 
+-The last booted build is only ~3 KB below the failing one, so treat ~3 KB as the remaining margin until the cause is known.
++The last booted build is only ~1 KB (1,032 bytes) below the failing one, so treat ~1 KB as the remaining margin until the cause is known. Any further growth has to be paid for first (a smaller page, or more `SYS_APP_*`/`SYS_ATCMD_*` flags off).
+ 
+ Check these numbers after every build that grows the image.
+ 

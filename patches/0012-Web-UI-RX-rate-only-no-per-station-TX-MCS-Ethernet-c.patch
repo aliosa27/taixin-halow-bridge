@@ -1,7 +1,7 @@
 From 8571ceff013709edfb05d581f61b78ef41baf018 Mon Sep 17 00:00:00 2001
 From: aliosa27 <aliosa27@aliosa27.me>
 Date: Thu, 19 Nov 2026 19:33:44 -0800
-Subject: [PATCH 12/22] Web UI: RX rate only (no per-station TX MCS); Ethernet
+Subject: [PATCH 12/23] Web UI: RX rate only (no per-station TX MCS); Ethernet
  card and per-peer WiFi traffic
 
 The lmac does not implement LMAC_IOCTL_GET_STA_TX_MCS, so tx_mcs always
