@@ -22,7 +22,7 @@
 
   const deviceSettingData =
   ['wifi_ap_hide', 'wifi_chan',/* 'wifi_mcs', */'wifi_bssbw', 'wifi_beaconint', 'wifi_dtim_period', 'wifi_bss_max_idle',
-    'wifi_chan_list', 'module_type'] as const;
+    'wifi_chan_list', 'module_type', 'wifi_txpower', 'wifi_super_pwr', 'wifi_acktmo'] as const;
 
   type deviceSettings = {
     [key in typeof deviceSettingData[number]]: string;
@@ -37,7 +37,21 @@
   const showInputErrMsg: strObj = reactive({
     beaconInt: '',
     dtim: '',
-    bssMaxIdle: ''
+    bssMaxIdle: '',
+    txPower: '',
+    ackTmo: ''
+  });
+
+  // Range: extra ACK timeout (us, AT+ACK_TO) from link distance, 10 us per km beyond the first.
+  // The box holds the value; the slider is derived from it, so either can be edited.
+  const distKm = computed({
+    get() {
+      const us = parseInt(settingReactive.value.wifi_acktmo) || 0;
+      return Math.min(50, 1 + us / 10);
+    },
+    set(km: number) {
+      settingReactive.value.wifi_acktmo = String(Math.round(10 * (km - 1)));
+    }
   });
 
   onBeforeMount(async () => await loadPageData(
@@ -185,6 +199,10 @@
         errs++
         break
     }
+    showInputErrMsg.txPower = inputValidate.enforceNumberInputLimit(settingReactive.value.wifi_txpower, 1, 20) === INPUT_CHECK.OK ? '' : tg('invalidInput');
+    showInputErrMsg.ackTmo = inputValidate.enforceNumberInputLimit(settingReactive.value.wifi_acktmo, 0, 1000) === INPUT_CHECK.OK ? '' : tg('invalidInput');
+    if (showInputErrMsg.txPower) errs++;
+    if (showInputErrMsg.ackTmo) errs++;
     if (region.value === 'custom' && freqErr.value) errs++;
     inputOK.value = errs === 0;
   });
@@ -248,6 +266,32 @@
         <input id="bssMaxIdle" type="number" v-model="bssMaxIdle" />
       </div>
     </fieldset>
+    <fieldset v-if="settingReactive.wifi_txpower">
+      <legend>{{t('rangePower')}}</legend>
+      <div class="ctrl-group">
+        <label for="dist">{{t('distance')}}</label>
+        <input id="dist" type="range" min="1" max="50" step="0.5" v-model.number="distKm" />
+        <span class="msg-inline">{{distKm <= 1 ? t('upTo1') : distKm + ' km'}}</span>
+      </div>
+      <div class="ctrl-group">
+        <label for="acktmo">{{t('ackTmo')}}</label>
+        <input id="acktmo" type="number" min="0" max="1000" v-model="settingReactive.wifi_acktmo" />
+        <span class="msg-warn">{{showInputErrMsg.ackTmo}}</span>
+        <span class="msg-help">{{t('ackHelp')}}</span>
+      </div>
+      <div class="ctrl-group">
+        <label for="txpower">{{t('txPower')}}</label>
+        <input id="txpower" type="number" min="1" max="20" v-model="settingReactive.wifi_txpower" />
+        <span class="msg-warn">{{showInputErrMsg.txPower}}</span>
+      </div>
+      <div class="ctrl-group">
+        <label for="superpwr">{{t('superPwr')}}</label>
+        <select id="superpwr" v-model="settingReactive.wifi_super_pwr">
+          <option v-for="(o, i) in ['off', 'on', 'sp22', 'sp25']" :key="o" :value="String(i)">{{t(o)}}</option>
+        </select>
+        <span class="msg-help">{{t('pwrHelp')}}</span>
+      </div>
+    </fieldset>
   </form>
   <saveApplyBtnVue which-settings="wifiAdvanced" :setting-reactive="settingReactive" :input-checked="inputOK"></saveApplyBtnVue>
 </div>
@@ -273,7 +317,19 @@
       "auto": "AUTO",
       "beaconInt": "Beacon Interval",
       "dtim": "DTIM Period",
-      "bssMaxIdle": "BSS Max Idle"
+      "bssMaxIdle": "BSS Max Idle",
+      "rangePower": "Range and power",
+      "distance": "Link distance",
+      "upTo1": "up to 1 km",
+      "ackTmo": "Extra ACK timeout (µs)",
+      "ackHelp": "Set by the slider as 10 µs per km beyond the first, or type a value (0–1000). Use the same value on both ends; too low a value causes retries on long links. 0 = default.",
+      "txPower": "TX power (dBm)",
+      "superPwr": "Power boost",
+      "off": "Off",
+      "on": "On (default)",
+      "sp22": "22 dBm only",
+      "sp25": "25 dBm only",
+      "pwrHelp": "TX power 1–20 dBm (default 20). The boost raises output above 20 dBm. Stay within your region's legal limit, including antenna gain."
     },
     "zhCN": {
       "header": "无线高级配置",

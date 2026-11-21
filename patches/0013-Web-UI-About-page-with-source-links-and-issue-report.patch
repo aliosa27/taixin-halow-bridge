@@ -1,7 +1,7 @@
 From f1251a4e0b2ade92937062093caa33fcdc29e785 Mon Sep 17 00:00:00 2001
 From: aliosa27 <aliosa27@aliosa27.me>
 Date: Fri, 20 Nov 2026 06:37:17 -0800
-Subject: [PATCH 13/21] Web UI: About page with source links and issue
+Subject: [PATCH 13/22] Web UI: About page with source links and issue
  reporting
 
 ---

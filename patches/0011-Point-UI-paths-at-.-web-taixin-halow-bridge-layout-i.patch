@@ -1,7 +1,7 @@
 From 8e1654aa79d93e4ce161f77ceaab5e58db1699d6 Mon Sep 17 00:00:00 2001
 From: aliosa27 <aliosa27@aliosa27.me>
 Date: Thu, 19 Nov 2026 18:45:08 -0800
-Subject: [PATCH 11/21] Point UI paths at ../web (taixin-halow-bridge layout);
+Subject: [PATCH 11/22] Point UI paths at ../web (taixin-halow-bridge layout);
  ignore CDK-generated files
 
 ---

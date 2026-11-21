@@ -1,7 +1,7 @@
 From 26e4a7bccdde7fe81cfb5f6d5769693aba45b8ee Mon Sep 17 00:00:00 2001
 From: aliosa27 <aliosa27@aliosa27.me>
 Date: Thu, 19 Nov 2026 10:09:27 -0800
-Subject: [PATCH 08/21] AT+SYSCFG and AT+SCAN? reply through atcmd_printf
+Subject: [PATCH 08/22] AT+SYSCFG and AT+SCAN? reply through atcmd_printf
 
 syscfg_dump() now prints with atcmd_printf, so AT+SYSCFG output reaches
 the web AT console and netAT, not only the UART log.
