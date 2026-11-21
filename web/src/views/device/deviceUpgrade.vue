@@ -31,7 +31,7 @@
   function reloadPage() {
   	setTimeout(() => {
   		location.reload();
-  	}, 5000);
+  	}, 3000);
   }
 
 	function uploadStatus(status: RET) {
@@ -106,9 +106,9 @@
 			"selectFile": "Select Firmware File:",
 			"progress": "Progress:",
 			"btnUpload": "Upload",
-			"confirmUpload": "Are you sure to upgrade??",
+			"confirmUpload": "Are you sure you want to upgrade?",
 			"uploadFail": "Upload firmware fail!!, please retry!!",
-			"uploadSuccess": "Upload successful!! Device will now reboot, back to login page in 3s",
+			"uploadSuccess": "Upgrade successful, reloading in 3 seconds",
 			"noFile": "No File selected!!",
 			"invalidFile": "Invalid file type!! Please select a .bin firmware file!!"
 		},

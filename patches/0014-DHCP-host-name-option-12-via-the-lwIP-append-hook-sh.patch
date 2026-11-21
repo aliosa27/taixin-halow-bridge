@@ -1,7 +1,7 @@
 From 7f31c5b85d4b33aa570039df66fc91fa6e5bb4df Mon Sep 17 00:00:00 2001
 From: aliosa27 <aliosa27@aliosa27.me>
 Date: Fri, 20 Nov 2026 10:03:07 -0800
-Subject: [PATCH 14/20] DHCP host name (option 12) via the lwIP append hook;
+Subject: [PATCH 14/21] DHCP host name (option 12) via the lwIP append hook;
  shown on Status
 
 ---

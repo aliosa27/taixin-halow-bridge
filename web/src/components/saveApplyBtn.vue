@@ -149,7 +149,7 @@
       "saveApply": "Save & apply",
       "reset": "Reset",
       "errInForm": "Some fields are invalid. Please check the form.",
-      "confirmPasswdChange": "Are you sure to change Password?",
+      "confirmPasswdChange": "Are you sure you want to change the password?",
       "logout": " Returning to the login page…"
     },
     "zhCN": {

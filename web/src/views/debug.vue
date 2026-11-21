@@ -1,12 +1,12 @@
 <script setup lang="ts">
-  import { ref, nextTick } from 'vue';
+  import { ref, nextTick, onUnmounted } from 'vue';
   import { useI18n } from 'vue-i18n';
-  import { atCommand, RET } from '@/wnbCom';
+  import { atCommand, logRead, RET } from '@/wnbCom';
   import { useDashboardStore } from '@/store';
   import { logoutIn3s } from '@/router';
   import msgPopupVue from '@/components/msgPopup.vue';
   import { Icon } from '@vicons/utils';
-  import { TerminalOutlined } from '@vicons/material';
+  import { TerminalOutlined, ArticleOutlined } from '@vicons/material';
 
   const { t } = useI18n({
     inheritLocale: true,
@@ -55,6 +55,65 @@
     if (outEl.value) outEl.value.scrollTop = outEl.value.scrollHeight;
   }
 
+  /* ---- Device log: polls logread=<seq> once a second while running ---- */
+  const LOG_MAX = 60000;   // characters kept in the browser
+  const logOn = ref<boolean>(false);
+  const logText = ref<string>('');
+  const logErr = ref<string>('');
+  const logEl = ref<HTMLElement | null>(null);
+  let seq = 0;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+
+  async function poll() {
+    if (!logOn.value) return;
+    const r = await logRead(seq, dashboardStore.authToken);
+    if (!logOn.value) return;
+    if (r.state === RET.AUTH_FAIL) {
+      stopLog();
+      popAuthFail.value = true;
+      logoutIn3s();
+      return;
+    }
+    if (r.state === RET.OK) {
+      logErr.value = '';
+      seq = r.seq;
+      if (r.text) {
+        const el = logEl.value;
+        const atEnd = !el || el.scrollHeight - el.scrollTop - el.clientHeight < 30;
+        let s = logText.value + r.text.replace(/\x1b\[[0-9;]*m/g, '').replace(/\r/g, '');
+        if (s.length > LOG_MAX) s = s.slice(s.length - LOG_MAX);
+        logText.value = s;
+        if (atEnd) {
+          await nextTick();
+          if (logEl.value) logEl.value.scrollTop = logEl.value.scrollHeight;
+        }
+      }
+    } else {
+      logErr.value = t('logErr');
+    }
+    timer = setTimeout(poll, 1000);
+  }
+
+  function startLog() {
+    logOn.value = true;
+    poll();
+  }
+
+  function stopLog() {
+    logOn.value = false;
+    if (timer) clearTimeout(timer);
+  }
+
+  function saveLog() {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([logText.value], { type: 'text/plain' }));
+    a.download = 'halow-bridge-log.txt';
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
+  onUnmounted(stopLog);
+
   function onKey(e: KeyboardEvent) {
     if (e.key === 'ArrowUp' && histIdx > 0) {
       cmd.value = history[--histIdx];
@@ -87,6 +146,19 @@
       </div>
       <p class="hint">{{t('atHelp')}}</p>
     </section>
+    <section class="card log-card">
+      <h3><Icon><ArticleOutlined /></Icon>{{t('log')}}
+        <span class="chip" :class="{ ok: logOn && !logErr }">{{logErr || (logOn ? t('live') : t('stopped'))}}</span>
+      </h3>
+      <pre class="term" ref="logEl">{{logText || t('logHint')}}</pre>
+      <div class="at-line">
+        <button v-if="!logOn" class="btn-blue" type="button" @click="startLog">{{t('start')}}</button>
+        <button v-else class="btn-blue" type="button" @click="stopLog">{{t('stop')}}</button>
+        <button type="button" @click="logText = ''">{{t('clear')}}</button>
+        <button type="button" :disabled="!logText" @click="saveLog">{{t('save')}}</button>
+      </div>
+      <p class="hint">{{t('logHelp')}}</p>
+    </section>
   </div>
   <msgPopupVue v-model:pop="popAuthFail" mode="Logout">{{tg('authTMout')}}</msgPopupVue>
 </template>
@@ -109,13 +181,15 @@
   .chips { display: flex; flex-wrap: wrap; gap: .4rem; margin-top: .6rem; }
   .chips button { font: .8rem ui-monospace, Consolas, monospace; padding: .3em .7em; }
   .hint { margin: .7rem 0 0; color: var(--muted); font-size: .85em; }
+  .log-card { margin-top: 1rem; }
+  .log-card h3 .chip { margin-left: auto; font-weight: 500; }
 </style>
 
 <i18n lang="json">
   {
     "enUS": {
       "header": "Debug",
-      "sub": "Send AT commands to the device.",
+      "sub": "Send AT commands and follow the device log.",
       "console": "AT console",
       "consoleHint": "Replies appear here. Try AT+VERSION.",
       "placeholder": "AT+…   (↑/↓ for history)",
@@ -123,10 +197,19 @@
       "running": "Running…",
       "clear": "Clear",
       "notAT": "Commands must start with AT.",
-      "noReply": "(no reply — this command prints to the UART log instead)",
+      "noReply": "(no reply — this command prints to the device log instead; see below)",
       "timeout": "(timed out)",
       "failed": "(request failed)",
-      "atHelp": "Commands run exactly as on the UART, including ones that change or erase settings. Settings changed here bypass the web UI's checks and may need a reboot to take effect. Some commands print to the UART log rather than replying here."
+      "atHelp": "Commands run exactly as on the UART, including ones that change or erase settings. Settings changed here bypass the web UI's checks and may need a reboot to take effect. Some commands print to the device log rather than replying here.",
+      "log": "Device log",
+      "live": "live",
+      "stopped": "stopped",
+      "logErr": "unavailable",
+      "logHint": "Press Start to follow the device log (the same output as the UART).",
+      "start": "Start",
+      "stop": "Stop",
+      "save": "Save",
+      "logHelp": "Shows log lines from the moment it is started; the device keeps the last 1 KB, so keep this page open to follow it. Capture stops on its own 30 s after this page stops polling."
     }
   }
 </i18n>
