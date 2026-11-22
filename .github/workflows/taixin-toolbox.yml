@@ -1,11 +1,12 @@
 # Builds tools/taixin-toolbox for Windows, macOS (universal) and Linux.
-# A tag toolbox-v* (e.g. toolbox-v0.2.0) also publishes the archives as a GitHub release.
+# A tag toolbox-v* (e.g. toolbox-v0.2.0), or a firmware release tag 20YY.MM.DD, also publishes
+# the archives as a GitHub release (the firmware .bin is attached to it by hand).
 name: taixin-toolbox
 
 on:
   push:
     branches: [main]
-    tags: ['toolbox-v*']
+    tags: ['toolbox-v*', '20*']
     paths:
       - 'tools/taixin-toolbox/**'
       - '.github/workflows/taixin-toolbox.yml'
@@ -94,7 +95,7 @@ jobs:
           if-no-files-found: error
 
   release:
-    if: startsWith(github.ref, 'refs/tags/toolbox-v')
+    if: startsWith(github.ref, 'refs/tags/')
     needs: build
     runs-on: ubuntu-latest
     permissions:
@@ -110,6 +111,6 @@ jobs:
 
       - uses: softprops/action-gh-release@v2
         with:
-          name: Taixin toolbox ${{ github.ref_name }}
+          name: ${{ startsWith(github.ref_name, 'toolbox-v') && format('Taixin toolbox {0}', github.ref_name) || github.ref_name }}
           files: dist/*
           generate_release_notes: true
