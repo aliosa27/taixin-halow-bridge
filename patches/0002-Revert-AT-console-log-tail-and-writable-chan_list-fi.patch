@@ -1,7 +1,7 @@
 From 32596dfcb5670d8484c129cfba2a575a898fa2eb Mon Sep 17 00:00:00 2001
 From: aliosa27 <aliosa27@aliosa27.me>
 Date: Wed, 18 Nov 2026 19:27:06 -0800
-Subject: [PATCH 02/27] Revert AT console, log tail and writable chan_list
+Subject: [PATCH 02/28] Revert AT console, log tail and writable chan_list
  (firmware did not boot)
 
 Back to the last build that booted (embedded page 49,693 bytes gzip).

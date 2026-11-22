@@ -1,7 +1,7 @@
 From 3bb48dff0ef54cfb4463654497db774ca9d814dc Mon Sep 17 00:00:00 2001
 From: aliosa27 <aliosa27@aliosa27.me>
 Date: Sun, 22 Nov 2026 09:38:28 -0800
-Subject: [PATCH 27/27] NOTES.md: UART AT typing verified on hardware
+Subject: [PATCH 27/28] NOTES.md: UART AT typing verified on hardware
 
 ---
  NOTES.md | 2 +-

@@ -1,0 +1,122 @@
+From 3302b2c0243b58cd5ece88a5177a34f019e1bb8c Mon Sep 17 00:00:00 2001
+From: aliosa27 <aliosa27@aliosa27.me>
+Date: Sun, 22 Nov 2026 12:43:27 -0800
+Subject: [PATCH 28/28] Station side: DHCP server on the fallback address while
+ there is no WiFi link
+
+After 60 s without a lease the device already falls back to 192.168.123.1.
+A station with no link now also serves DHCP there (192.168.123.100-200,
+router/DNS 192.168.123.1, 2-minute leases), so a PC cabled straight to it
+gets an address. Stopped when the link comes up (events.c) or a lease
+arrives, so it never competes with a real server across the bridge.
+---
+ NOTES.md         |  2 +-
+ project/events.c |  1 +
+ project/main.c   | 43 ++++++++++++++++++++++++++++++++++++++++++-
+ project/syscfg.h |  1 +
+ 4 files changed, 45 insertions(+), 2 deletions(-)
+
+diff --git a/NOTES.md b/NOTES.md
+index 9395ea1..29a9fce 100644
+--- a/NOTES.md
++++ b/NOTES.md
+@@ -21,7 +21,7 @@ Taixin TXW8301 (TXW4002A, C-SKY CK803) HaLow wireless-bridge (WNB) firmware SDK
+ 
+ ## Code map
+ 
+-- `main.c`: init order (`sys_cfg_load` → role key → WiFi → network → `sys_app_init`), DHCP server start, 1 s main loop. It `#include`s `atcmd.c`. `sys_dhcpc_check()` (main loop) also does the DHCP fallback: with the DHCP client on and no lease (`dhcp_supplied_address`) for 60 s, `w0` gets 192.168.123.1/24 (fixed, not `sys_cfgs.ipaddr`) and DHCP is restarted; a later lease replaces it. Note `events.c` still copies each lease into `sys_cfgs.ipaddr`, which is the boot address until the fallback kicks in.
++- `main.c`: init order (`sys_cfg_load` → role key → WiFi → network → `sys_app_init`), DHCP server start, 1 s main loop. It `#include`s `atcmd.c`. `sys_dhcpc_check()` (main loop) also does the DHCP fallback: with the DHCP client on and no lease (`dhcp_supplied_address`) for 60 s, `w0` gets 192.168.123.1/24 (fixed, not `sys_cfgs.ipaddr`) and DHCP is restarted; a later lease replaces it. Note `events.c` still copies each lease into `sys_cfgs.ipaddr`, which is the boot address until the fallback kicks in. On the station side, while `w0` is on the fallback address and there is no WiFi link, `sys_fallback_dhcpd()` also runs the DHCP server (192.168.123.100–200, router and DNS 192.168.123.1, 2-minute leases), so a PC cabled straight to the device gets an address. It stops when a lease arrives, and on `SYSEVT_WIFI_CONNECTTED` (`events.c`) so it never serves DHCP across the bridge. Verified on hardware (2026-11-22).
+ - `syscfg.c`/`syscfg.h`: `sys_cfgs` defaults, `wificfg_flush()` (pushes config to an interface), `syscfg_flush()` (restart WiFi with current config), mode enum (`STA=1`, `WNBSTA=2`, `AP=3`, `WNBAP=4`, repeater modes from `AP_STA=5`). The mode number is also the interface index (`wificfg_get_ifidx`).
+ - `sdk/lib/common/atcmd.c`: source for the `sys_wifi_atcmd_*` handlers, the reference for how to change settings correctly (channel = 1-based index into `chan_list`, bandwidth ∈ {1,2,4,8} MHz, `chan_list` in 100 kHz units, PSK via `wpa_passphrase`).
+ - `project_config.h` overrides the defaults in `sys_config.h` (`#ifndef` pattern). With `ROLE_KEY_EN`, GPIO `PA_8` picks the AP or STA side at boot (high = AP) and overrides the saved side. It keeps the saved type: `ap` and `sta` stay standard, `wnbap` and `wnbsta` stay WNB (`sys_role_key_init` in `main.c`). Repeater modes ignore the pin.
+diff --git a/project/events.c b/project/events.c
+index 0400e62..7c18bb7 100644
+--- a/project/events.c
++++ b/project/events.c
+@@ -57,6 +57,7 @@ sysevt_hdl_res sys_event_hdl(uint32 event_id, uint32 data, uint32 priv)
+         case SYS_EVENT(SYS_EVENT_WIFI, SYSEVT_WIFI_CONNECTTED):
+             sys_status.wifi_connected = 1;
+ #if SYS_NETWORK_SUPPORT
++            sys_fallback_dhcpd(0);              /* never serve DHCP across the bridge */
+             if(sys_cfgs.dhcpc_en){
+                 if(sys_cfgs.roam_start && sys_status.dhcpc_done) break;
+                 os_printf(KERN_NOTICE"wifi connected, start dhcp client ...\r\n");
+diff --git a/project/main.c b/project/main.c
+index ce3a1cf..b1f5480 100644
+--- a/project/main.c
++++ b/project/main.c
+@@ -339,6 +339,43 @@ const char *sys_dhcp_hostname(void)
+ }
+ 
+ #define SYS_DHCPC_FALLBACK_SEC 60   /* no DHCP lease for this long: fall back to 192.168.123.1/24 */
++#define SYS_FALLBACK_IP        0x017BA8C0   /* 192.168.123.1 */
++
++/* Station side, on the fallback address with no WiFi link: also serve DHCP
++ * (192.168.123.100-200, 2-minute leases), so a PC cabled straight to the
++ * device gets an address. 60 s without a lease means no DHCP server answered
++ * on the Ethernet side. Stopped as soon as the link comes up (events.c) or a
++ * lease arrives, so it never competes with a real server across the bridge;
++ * the short lease makes clients move to the real network soon after. */
++static uint8 sys_fallback_dhcpd_on;
++
++void sys_fallback_dhcpd(uint8 on)
++{
++    struct dhcpd_param param;
++
++    if (on == sys_fallback_dhcpd_on) {
++        return;
++    }
++    sys_fallback_dhcpd_on = on;
++    if (!on) {
++        dhcpd_stop("w0");
++        os_printf(KERN_NOTICE"fallback dhcp server stopped\r\n");
++        return;
++    }
++    os_memset(&param, 0, sizeof(param));
++    param.start_ip   = 0x647BA8C0;          /* 192.168.123.100 */
++    param.end_ip     = 0xC87BA8C0;          /* 192.168.123.200 */
++    param.netmask    = 0x00FFFFFF;
++    param.router     = SYS_FALLBACK_IP;
++    param.dns1       = SYS_FALLBACK_IP;
++    param.dns2       = SYS_FALLBACK_IP;
++    param.lease_time = 120;
++    if (dhcpd_start("w0", &param)) {
++        os_printf("dhcpd start error\r\n");  /* not retried until the next fallback */
++    } else {
++        os_printf(KERN_NOTICE"no wifi link: dhcp server on 192.168.123.100-200\r\n");
++    }
++}
+ 
+ static void sys_dhcpc_check(void)
+ {
+@@ -359,13 +396,17 @@ static void sys_dhcpc_check(void)
+         nolease_sec = 0;
+     } else if (nolease_sec < SYS_DHCPC_FALLBACK_SEC && ++nolease_sec == SYS_DHCPC_FALLBACK_SEC) {
+         ip_addr_t ip, mask, gw;
+-        ip.addr   = 0x017BA8C0;             /* 192.168.123.1 */
++        ip.addr   = SYS_FALLBACK_IP;
+         mask.addr = 0x00FFFFFF;             /* 255.255.255.0 */
+         gw.addr   = 0;
+         lwip_netif_set_ip2("w0", &ip, &mask, &gw);
+         lwip_netif_set_dhcp2("w0", 1);
+         os_printf(KERN_NOTICE"no dhcp lease after %ds, fallback ip 192.168.123.1\r\n", SYS_DHCPC_FALLBACK_SEC);
+     }
++
++    /* Also follows link loss after the fallback, as long as the address is still the fallback one. */
++    sys_fallback_dhcpd(nolease_sec == SYS_DHCPC_FALLBACK_SEC && !MODE_IS_AP(sys_cfgs.wifi_mode) &&
++                       !sys_status.wifi_connected && nif->ip_addr.addr == SYS_FALLBACK_IP);
+ }
+ 
+ static void sys_print_dbgtime(uint32 *buff, uint32 size)
+diff --git a/project/syscfg.h b/project/syscfg.h
+index 460e943..ce6b3c2 100644
+--- a/project/syscfg.h
++++ b/project/syscfg.h
+@@ -110,6 +110,7 @@ void sys_wifi_scan(void);
+ void syscfg_check(void);
+ void syscfg_dump(void);
+ void sys_dhcpd_start(void);
++void sys_fallback_dhcpd(uint8 on);     /* main.c; station-side DHCP server while on the fallback address */
+ const char *sys_dhcp_hostname(void);   /* main.c; DHCP option 12 */
+ 
+ 

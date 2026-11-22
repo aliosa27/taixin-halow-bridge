@@ -1,7 +1,7 @@
 From df7ccf9ab710df5a17e47ba0cb3531cfc3bd5911 Mon Sep 17 00:00:00 2001
 From: aliosa27 <aliosa27@aliosa27.me>
 Date: Sun, 22 Nov 2026 09:38:14 -0800
-Subject: [PATCH 26/27] UART AT input: echo, line editing, run on Enter
+Subject: [PATCH 26/28] UART AT input: echo, line editing, run on Enter
 
 libatcmd's UART front end treats each burst of input ending in a 5-tick gap
 as one command and echoes nothing, so typing in a terminal sent one-letter

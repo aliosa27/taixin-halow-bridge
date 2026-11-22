@@ -20,6 +20,7 @@ This firmware has been tested on:
 
 - [LILYGO T-Halow](https://lilygo.cc/products/t-halow)
 - [LILYGO T-Halow RJ45](https://lilygo.cc/products/t-halow-rj45)
+- [HaLow bridge with Ethernet and USB-C (Amazon B0GZNNHVK7)](https://www.amazon.com/dp/B0GZNNHVK7). Both Ethernet and USB-C networking work.
 - Most Taixin TXW8301 HaLow Ethernet bridges
 - [Anjielo HaLow Ethernet bridge kit](https://anjielo.com/products/wireless-signal-wall-through-ethernet-air-connector-port-bridge-kit-outdoor-long-distance-up-to-1000-meters-transmitter-receiver?variant=43940661362905)
 - [Anjielo HaLow Wi-Fi extender](https://anjielo.com/products/anjielosmart-ah-wifi-halow-extender-long-distance-wi-fi-outdoor-ap-extender-powerful-high-gain-2-4-5g-antenna-wifi-range-extender-amplifier). This firmware has not been tested on its receiver unit (the side with the 2.4/5 GHz Wi-Fi access point). That unit, on its stock firmware, connects to a device running this firmware in WNB Access Point mode.
@@ -58,7 +59,7 @@ Open **Firmware**, choose the `.bin`, and press **Upload**. Confirm "Are you sur
 ### Finding the device
 
 - The device gets its address over DHCP. It sends the host name `<device name>-<last 6 MAC hex digits>`, for example `tx-7358c8`, so look for that name in your router's lease list.
-- With no DHCP lease after 60 seconds, the device uses 192.168.123.1 (255.255.255.0) and keeps asking for a lease. Give your PC an address in 192.168.123.0/24 and open http://192.168.123.1.
+- With no DHCP lease after 60 seconds, the device uses 192.168.123.1 (255.255.255.0) and keeps asking for a lease. On the station side with no HaLow link, it also hands out addresses (192.168.123.100–200, 2-minute leases), so a PC cabled straight to it gets one on its own; otherwise give your PC an address in 192.168.123.0/24. Then open http://192.168.123.1.
 - The default web password is `admin`.
 
 ## Web UI
@@ -171,7 +172,7 @@ CDK rewrites `txw4002a.mk`, `cdkws.mk`, `*.cdkws` and `*.modify.bat` on every op
 ## Changes from the vendor firmware
 
 - Web admin UI served from the device (`project/webui.c`), as shown above.
-- DHCP client: sends the host name `<device name>-<MAC suffix>`, and falls back to 192.168.123.1/24 after 60 s without a lease while it keeps asking for one.
+- DHCP client: sends the host name `<device name>-<MAC suffix>`, and falls back to 192.168.123.1/24 after 60 s without a lease while it keeps asking for one. A station with no HaLow link also runs a DHCP server on that address until the link comes up or a lease arrives.
 - TX power, power boost and extra ACK timeout are saved in the config and applied at boot.
 - `AT+SYSCFG` and the new `AT+SCAN?` reply through the AT channel.
 - AT commands can be typed in a serial terminal (UART1, 115200 8N1): input is echoed, Backspace works, and Enter runs the line. Tools that send whole lines work as before.

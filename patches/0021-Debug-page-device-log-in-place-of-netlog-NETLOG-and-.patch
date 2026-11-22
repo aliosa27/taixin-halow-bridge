@@ -1,7 +1,7 @@
 From 42f7d5932e3504224f4e0c3e8a2ed3f55e20e21f Mon Sep 17 00:00:00 2001
 From: aliosa27 <aliosa27@aliosa27.me>
 Date: Fri, 20 Nov 2026 17:40:51 -0800
-Subject: [PATCH 21/27] Debug page device log in place of netlog (NETLOG and
+Subject: [PATCH 21/28] Debug page device log in place of netlog (NETLOG and
  NETAT off); clearer confirmation wording
 
 ---
