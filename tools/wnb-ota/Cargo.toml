@@ -1,0 +1,16 @@
+[package]
+name = "wnb-ota"
+version = "0.1.0"
+edition = "2021"
+description = "Find and update Taixin TXW8301 HaLow bridges over Ethernet (WNB OTA protocol)"
+license = "Apache-2.0"
+
+[dependencies]
+eframe = "0.29"
+libloading = "0.8"
+rfd = "0.15"
+
+[profile.release]
+opt-level = "s"
+lto = true
+strip = true
