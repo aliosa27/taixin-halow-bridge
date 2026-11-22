@@ -1,7 +1,7 @@
 From c899b14c5ecd14f7a1cd0ee187b1cc02c1071f13 Mon Sep 17 00:00:00 2001
 From: aliosa27 <aliosa27@aliosa27.me>
 Date: Fri, 20 Nov 2026 15:46:13 -0800
-Subject: [PATCH 19/25] Web UI: keep link wrapping on the About page only (MAC
+Subject: [PATCH 19/26] Web UI: keep link wrapping on the About page only (MAC
  stays on one line on Status)
 
 ---

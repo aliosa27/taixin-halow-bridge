@@ -174,6 +174,7 @@ CDK rewrites `txw4002a.mk`, `cdkws.mk`, `*.cdkws` and `*.modify.bat` on every op
 - DHCP client: sends the host name `<device name>-<MAC suffix>`, and falls back to 192.168.123.1/24 after 60 s without a lease while it keeps asking for one.
 - TX power, power boost and extra ACK timeout are saved in the config and applied at boot.
 - `AT+SYSCFG` and the new `AT+SCAN?` reply through the AT channel.
+- AT commands can be typed in a serial terminal (UART1, 115200 8N1): input is echoed, Backspace works, and Enter runs the line. Tools that send whole lines work as before.
 - Removed to save SRAM: `AT+PING`/`AT+IPERF2` (~6 KB), and the network log and network AT services (replaced by the Debug page).
 
 Defaults to change before shipping a product: WiFi passphrase `12345678`, web password `admin`.

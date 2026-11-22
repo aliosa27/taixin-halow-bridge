@@ -1,7 +1,7 @@
 From 92df40db19c1456868a33ddb904b22d256880f77 Mon Sep 17 00:00:00 2001
 From: aliosa27 <aliosa27@aliosa27.me>
 Date: Fri, 20 Nov 2026 21:10:17 -0800
-Subject: [PATCH 23/25] NOTES.md: boot margin after device log and range/power,
+Subject: [PATCH 23/26] NOTES.md: boot margin after device log and range/power,
  page size, heap investigation
 
 ---

@@ -1,0 +1,191 @@
+From df7ccf9ab710df5a17e47ba0cb3531cfc3bd5911 Mon Sep 17 00:00:00 2001
+From: aliosa27 <aliosa27@aliosa27.me>
+Date: Sun, 22 Nov 2026 09:38:14 -0800
+Subject: [PATCH 26/26] UART AT input: echo, line editing, run on Enter
+
+libatcmd's UART front end treats each burst of input ending in a 5-tick gap
+as one command and echoes nothing, so typing in a terminal sent one-letter
+commands. Replace it: binary bursts (XMODEM for AT+FWUPG) and whole lines
+sent at once pass through as before; typed input is echoed, Backspace/DEL
+edit it, and CR or LF runs the line.
+---
+ NOTES.md        |  16 ++++++
+ project/atcmd.c | 131 +++++++++++++++++++++++++++++++++++++++++++++++-
+ 2 files changed, 146 insertions(+), 1 deletion(-)
+
+diff --git a/NOTES.md b/NOTES.md
+index 90fd383..607d393 100644
+--- a/NOTES.md
++++ b/NOTES.md
+@@ -98,6 +98,22 @@ So the DHCP change was not the (only) cause. **Leading theory: the image size.**
+ - **Debug page log tail.** `logread=<seq>` used a `print_redirect()` hook into a 4 KB ring buffer (code in the initial commit). The AT console part of the debug page was re-added on its own on 2026-11-18. The log tail was re-added on 2026-11-20 with `SYS_APP_NETLOG` and `SYS_APP_NETAT` turned off to pay for it (about 1.4 KB, see Web UI).
+ - **Editable `wifi_chan_list`**: re-added on 2026-11-18 as part of the region and bandwidth picker; see Web UI.
+ 
++## UART AT input (2026-11-22)
++
++`sys_atcmd_init` (`project/atcmd.c`) no longer calls libatcmd's `atcmd_uart_init`. That front end passes each burst of input that ends in a 5-tick gap to `atcmd_recv()` as one command, with no echo. A terminal sends each key as it is typed, so every key became its own one-letter "command" and nothing ran. Only tools that send a whole line at once worked; the stock firmware behaves the same.
++
++The replacement keeps libatcmd's buffer (1,032 bytes, heap) and gap, and sorts the input when a gap comes:
++
++- **Binary bytes:** passed on as is, for the XMODEM data of `AT+FWUPG`. `xmodem_fwupgrade_hdl` gets its data through `atcmd_recv`.
++- **A whole line in one burst:** passed on as is, without echo.
++- **Anything else is typing:**
++  - Typed characters are echoed.
++  - Backspace and DEL edit the line.
++  - CR or LF runs it.
++  - The LF of a CR LF and empty lines run nothing.
++
++It adds ~0.25 KB of code net of the dropped `atcmd_atcmd_uart.o`. Not yet tested on hardware: typing, `AT+FWUPG`.
++
+ ## AT reply gaps (found 2026-11-18, not fixed yet)
+ 
+ The web AT console (and any AT client) waits for `OK`/`ERROR`, which only `atcmd_printf` output carries. `os_printf` output, including `atcmd_err()`, goes to the UART log only. Of the handlers in `sdk/lib/common/atcmd.c`, only `AT+SYSCFG` has been fixed: `syscfg_dump()` (`project/syscfg.c`, called only from that handler) prints with `atcmd_printf`, and the handler ends with `atcmd_ok`. `AT+SCAN` only starts a background scan; `AT+SCAN?` (added) lists the last results as `+SCAN:<bssid>,<MHz>,<signal>,<enc 0|1>,<ssid>` lines, then `OK`. The other 123 handlers are in the closed libs and were not audited. Still open, on the user's request:
+diff --git a/project/atcmd.c b/project/atcmd.c
+index 252ef45..2024b66 100644
+--- a/project/atcmd.c
++++ b/project/atcmd.c
+@@ -200,14 +200,143 @@ static const struct hgic_atcmd static_atcmds[] = {
+ 
+ };
+ 
++/*
++ * UART front end for AT commands, in place of libatcmd's atcmd_uart_init().
++ * That one hands each burst of input that ends in a short gap (5 ticks) to
++ * atcmd_recv() as a whole command and echoes nothing, so a terminal that sends
++ * each key as it is typed delivers one-letter "commands" and nothing runs.
++ *
++ * This one sorts the input when a gap comes:
++ *  - Binary bytes (XMODEM for AT+FWUPG): passed on as is, like libatcmd.
++ *  - A whole line in one burst (tools, a terminal's "send line"): passed on as
++ *    is, without echo, like libatcmd.
++ *  - Anything else is typing: echoed, Backspace/DEL edit the line, and Enter
++ *    (CR or LF) runs it.
++ */
++#define ATU_BUF   1032                           /* as libatcmd: fits an XMODEM-1K packet */
++#define ATU_GAP   5                              /* ticks of silence that end a burst, as libatcmd */
++
++struct atcmd_uart {
++    struct atcmd_dataif dataif;                  /* first: libatcmd passes it back to us */
++    struct uart_device *uart;
++    struct os_timer     timer;
++    uint32 last;                                 /* os_jiffies() of the last byte */
++    uint16 len;                                  /* bytes in buf */
++    uint16 seen;                                 /* bytes of a typed line already echoed */
++    char   buf[ATU_BUF];
++};
++
++static int32 atu_write(struct atcmd_dataif *dataif, uint8 *buf, int32 len)
++{
++    return uart_puts(((struct atcmd_uart *)dataif)->uart, buf, len);
++}
++
++static int32 atu_read(struct atcmd_dataif *dataif, uint8 *buf, int32 len)
++{
++    struct uart_device *uart = ((struct atcmd_uart *)dataif)->uart;
++    int32 n = 0;
++    while (n < len && uart_ioctl(uart, UART_IOCTL_CMD_DATA_RDY, 0, 0)) {
++        buf[n++] = uart_getc(uart);
++    }
++    return n;
++}
++
++static int32 atu_irq(uint32 irq, uint32 irq_data, uint32 param1, uint32 param2)
++{
++    struct atcmd_uart *u = (struct atcmd_uart *)irq_data;
++    if (irq == UART_IRQ_FLAG_RX_BYTE && u->len < ATU_BUF) {
++        u->buf[u->len++] = (char)param1;
++        u->last = (uint32)os_jiffies();
++    }
++    return 0;
++}
++
++/* Run buf[0..len) as input, then drop buf[0..used) and keep what came in since. */
++static void atu_run(struct atcmd_uart *u, int32 len, int32 used)
++{
++    uint32 flag;
++
++    if (len > 0) {
++        atcmd_output_hdl(NULL, NULL);            /* replies go to the UART */
++        atcmd_recv((uint8 *)u->buf, len);
++    }
++    flag = disable_irq();
++    os_memmove(u->buf, u->buf + used, u->len - used);
++    u->len -= used;
++    u->seen = 0;
++    enable_irq(flag);
++}
++
++static void atu_timer(void *arg)
++{
++    struct atcmd_uart *u = (struct atcmd_uart *)arg;
++    int32 i, len = u->len, drop;
++    uint32 flag;
++    char c;
++
++    if (len == u->seen || (uint32)os_jiffies() - u->last < ATU_GAP) {
++        return;
++    }
++    for (i = u->seen; i < len; i++) {
++        c = u->buf[i];
++        if ((uint8)c < 0x20 && c != '\r' && c != '\n' && c != '\b') {
++            atu_run(u, len, len);                /* binary: XMODEM data */
++            return;
++        }
++    }
++    c = u->buf[len - 1];
++    if (u->seen == 0 && (c == '\r' || c == '\n') && u->buf[0] != '\r' && u->buf[0] != '\n') {
++        atu_run(u, len, len);                    /* a whole line at once */
++        return;
++    }
++    for (i = u->seen; i < len; i++) {            /* typing */
++        c = u->buf[i];
++        if (c == '\r' || c == '\n') {
++            if (i > 0) {                         /* not the LF of a CR LF, or an empty line */
++                uart_puts(u->uart, (uint8 *)"\r\n", 2);
++            }
++            atu_run(u, i, i + 1);
++            return;
++        }
++        if (c == '\b' || c == 0x7f) {
++            drop = i > 0 ? 2 : 1;                /* the key, and the character before it */
++            flag = disable_irq();
++            os_memmove(u->buf + i + 1 - drop, u->buf + i + 1, u->len - i - 1);
++            u->len -= drop;
++            enable_irq(flag);
++            len -= drop;
++            i   -= drop;
++            if (drop == 2) {
++                uart_puts(u->uart, (uint8 *)"\b \b", 3);
++            }
++        } else {
++            uart_putc(u->uart, c);
++        }
++    }
++    u->seen = len;
++}
++
+ __init void sys_atcmd_init(void)
+ {
+     struct atcmd_settings setting;
++    struct atcmd_uart *u;
++
+     os_memset(&setting, 0, sizeof(setting));
+     setting.args_count = ATCMD_ARGS_COUNT;
+     setting.printbuf_size = ATCMD_PRINT_BUF_SIZE;
+     setting.static_atcmds = static_atcmds;
+     setting.static_cmdcnt = ARRAY_SIZE(static_atcmds);
+-    atcmd_uart_init(ATCMD_UARTDEV, 115200, 5, &setting);
++
++    u = os_zalloc(sizeof(*u));
++    ASSERT(u);
++    u->uart = (struct uart_device *)dev_get(ATCMD_UARTDEV);
++    ASSERT(u->uart);
++    u->dataif.write = atu_write;
++    u->dataif.read  = atu_read;
++    uart_open(u->uart, 115200);
++    uart_request_irq(u->uart, atu_irq, UART_IRQ_FLAG_RX_BYTE, (uint32)u);
++    os_timer_init(&u->timer, atu_timer, OS_TIMER_MODE_PERIODIC, u);
++    os_timer_start(&u->timer, ATU_GAP);
++    atcmd_init(&u->dataif, &setting);
+ }
+ 
