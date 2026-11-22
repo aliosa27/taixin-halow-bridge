@@ -1,4 +1,4 @@
-// Taixin TXW8301 bridge tool: Ethernet OTA (docs/wnb-ota-protocol.md), NETAT console, NETLOG viewer.
+// Taixin toolbox: Ethernet OTA (docs/wnb-ota-protocol.md), NETAT console, NETLOG viewer, for TXW8301 bridges.
 #![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]
 
 mod fwfile;
@@ -20,6 +20,108 @@ enum Tab {
     Firmware,
     Netat,
     Netlog,
+    About,
+}
+
+// Same links as the firmware's About page (web/src/views/about.vue).
+const GH: &str = "https://github.com/";
+const REPO: &str = "aliosa27/taixin-halow-bridge";
+const MAIL: &str = "aliosa27@aliosa27.me";
+const SOURCES: &[(&str, &str)] = &[
+    ("This tool and firmware", REPO),
+    ("Vendor SDK", "Taixin-Semiconductor/TXW8301_WNB"),
+    ("Vendor web UI", "Taixin-Semiconductor/hgic-wnb-web"),
+];
+const CREDITS: &[(&str, &str)] = &[
+    ("NETAT / NETLOG packet layouts", "aliosa27/taixin_tools"),
+    ("OTA flash timing", "I-AM-ENGINEER/RNode_Halow_OTA_Flasher"),
+];
+
+/// Version line for the About page and issue reports.
+fn version_line() -> String {
+    format!(
+        "Taixin toolbox {} ({}, built {}) for {} {}",
+        env!("CARGO_PKG_VERSION"),
+        env!("TOOLBOX_COMMIT"),
+        env!("TOOLBOX_BUILD_DATE"),
+        std::env::consts::OS,
+        std::env::consts::ARCH
+    )
+}
+
+fn about_tab(ui: &mut egui::Ui) {
+    egui::ScrollArea::vertical().show(ui, |ui| {
+        ui.heading("About");
+        ui.label("Where this tool comes from and how to report problems");
+        ui.add_space(8.0);
+
+        let card = |ui: &mut egui::Ui, title: &str, body: &mut dyn FnMut(&mut egui::Ui)| {
+            egui::Frame::group(ui.style()).show(ui, |ui| {
+                ui.set_width(ui.available_width());
+                ui.strong(title);
+                ui.add_space(4.0);
+                body(ui);
+            });
+            ui.add_space(6.0);
+        };
+        let link = |ui: &mut egui::Ui, label: &str, repo: &str, path: &str| {
+            ui.label(egui::RichText::new(label).weak());
+            ui.hyperlink_to(format!("{repo}{path}"), format!("{GH}{repo}{path}"));
+            ui.add_space(2.0);
+        };
+
+        card(ui, "Version", &mut |ui| {
+            ui.horizontal(|ui| {
+                ui.monospace(version_line());
+                if ui.small_button("Copy").clicked() {
+                    ui.ctx().copy_text(version_line());
+                }
+            });
+        });
+        card(ui, "Source code", &mut |ui| {
+            for (k, r) in SOURCES {
+                link(ui, k, r, "");
+            }
+            ui.label(
+                egui::RichText::new(
+                    "Apache-2.0. The firmware is built from the Taixin SDK with patches; its web UI is derived \
+                     from the vendor UI.",
+                )
+                .small()
+                .weak(),
+            );
+        });
+        card(ui, "Credits", &mut |ui| {
+            for (k, r) in CREDITS {
+                link(ui, k, r, "");
+            }
+        });
+        card(ui, "Updates", &mut |ui| {
+            link(ui, "Releases (firmware and this tool)", REPO, "/releases");
+            ui.label(
+                egui::RichText::new(
+                    "Download the firmware .bin and install it on the Firmware (OTA) tab, or on the device's \
+                     Firmware page once it runs this firmware.",
+                )
+                .small()
+                .weak(),
+            );
+        });
+        card(ui, "Report an issue", &mut |ui| {
+            link(ui, "GitHub", REPO, "/issues");
+            ui.label(egui::RichText::new("Email").weak());
+            ui.hyperlink_to(MAIL, format!("mailto:{MAIL}"));
+            ui.add_space(2.0);
+            ui.label(
+                egui::RichText::new(
+                    "Include the version line above, the device's firmware version from Scan, the log at the \
+                     bottom of this window, and the UART log if the device misbehaves at boot.",
+                )
+                .small()
+                .weak(),
+            );
+        });
+    });
 }
 
 /// Text kept in the console and log views.
@@ -593,6 +695,7 @@ impl eframe::App for App {
                 ui.selectable_value(&mut self.tab, Tab::Firmware, "Firmware (OTA)");
                 ui.selectable_value(&mut self.tab, Tab::Netat, "NETAT console");
                 ui.selectable_value(&mut self.tab, Tab::Netlog, "NETLOG");
+                ui.selectable_value(&mut self.tab, Tab::About, "About");
             });
             ui.add_space(2.0);
         });
@@ -609,6 +712,7 @@ impl eframe::App for App {
             Tab::Firmware => self.firmware_tab(ui),
             Tab::Netat => self.netat_tab(ui),
             Tab::Netlog => self.netlog_tab(ui),
+            Tab::About => about_tab(ui),
         });
     }
 }
@@ -616,6 +720,10 @@ impl eframe::App for App {
 /// Console mode for testing without the GUI. Release builds on Windows have no console window.
 fn cli(args: &[String]) -> bool {
     let cmd = args.first().map(String::as_str);
+    if cmd == Some("--version") {
+        println!("{}", version_line());
+        return true;
+    }
     if !matches!(cmd, Some("--list" | "--scan" | "--netat-scan" | "--netat")) {
         return false;
     }
@@ -666,8 +774,8 @@ fn main() -> eframe::Result<()> {
         return Ok(());
     }
     let options = eframe::NativeOptions {
-        viewport: egui::ViewportBuilder::default().with_inner_size([860.0, 600.0]).with_title("Taixin bridge tool"),
+        viewport: egui::ViewportBuilder::default().with_inner_size([860.0, 600.0]).with_title(format!("Taixin toolbox {}", env!("CARGO_PKG_VERSION"))),
         ..Default::default()
     };
-    eframe::run_native("Taixin bridge tool", options, Box::new(|cc| Ok(Box::new(App::new(&cc.egui_ctx)))))
+    eframe::run_native("Taixin toolbox", options, Box::new(|cc| Ok(Box::new(App::new(&cc.egui_ctx)))))
 }

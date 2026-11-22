@@ -1,0 +1,115 @@
+# Builds tools/taixin-toolbox for Windows, macOS (universal) and Linux.
+# A tag toolbox-v* (e.g. toolbox-v0.2.0) also publishes the archives as a GitHub release.
+name: taixin-toolbox
+
+on:
+  push:
+    branches: [main]
+    tags: ['toolbox-v*']
+    paths:
+      - 'tools/taixin-toolbox/**'
+      - '.github/workflows/taixin-toolbox.yml'
+  pull_request:
+    paths:
+      - 'tools/taixin-toolbox/**'
+      - '.github/workflows/taixin-toolbox.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: tools/taixin-toolbox
+    shell: bash
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            name: windows-x86_64
+          - os: macos-14
+            name: macos-universal
+          - os: ubuntu-22.04
+            name: linux-x86_64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ runner.os == 'macOS' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: tools/taixin-toolbox
+
+      - name: Linux build dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libxkbcommon-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev
+
+      - name: Test
+        run: cargo test --locked
+
+      - name: Build
+        if: runner.os != 'macOS'
+        run: cargo build --release --locked
+
+      - name: Build (universal binary)
+        if: runner.os == 'macOS'
+        run: |
+          cargo build --release --locked --target aarch64-apple-darwin
+          cargo build --release --locked --target x86_64-apple-darwin
+          mkdir -p target/release
+          lipo -create -output target/release/taixin-toolbox \
+            target/aarch64-apple-darwin/release/taixin-toolbox \
+            target/x86_64-apple-darwin/release/taixin-toolbox
+          lipo -info target/release/taixin-toolbox
+
+      - name: Package
+        run: |
+          pkg=taixin-toolbox-${{ matrix.name }}
+          mkdir -p "dist/$pkg"
+          cp README.md "dist/$pkg/"
+          if [ "$RUNNER_OS" = Windows ]; then
+            cp target/release/taixin-toolbox.exe "dist/$pkg/"
+            (cd dist && 7z a "../$pkg.zip" "$pkg")
+          else
+            cp target/release/taixin-toolbox "dist/$pkg/"
+            tar -C dist -czf "$pkg.tar.gz" "$pkg"
+          fi
+          ./target/release/taixin-toolbox* --version 2>/dev/null || true
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: taixin-toolbox-${{ matrix.name }}
+          path: |
+            tools/taixin-toolbox/taixin-toolbox-${{ matrix.name }}.zip
+            tools/taixin-toolbox/taixin-toolbox-${{ matrix.name }}.tar.gz
+          if-no-files-found: error
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/toolbox-v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    defaults:
+      run:
+        working-directory: .
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          name: Taixin toolbox ${{ github.ref_name }}
+          files: dist/*
+          generate_release_notes: true

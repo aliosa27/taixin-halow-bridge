@@ -9,7 +9,8 @@ This repository does not contain the vendor SDK. It holds:
 | `patches/` | `git format-patch` series against [Taixin-Semiconductor/TXW8301_WNB](https://github.com/Taixin-Semiconductor/TXW8301_WNB) at `0e273c8` (SDK v2.4.1.3-43933) |
 | `web/` | The web admin UI (Vue 3 + Vite). It started from [Taixin-Semiconductor/hgic-wnb-web](https://github.com/Taixin-Semiconductor/hgic-wnb-web) (`2e0384c`) but has diverged too far to keep as a patch, so the full source is here. |
 | `scripts/` | `apply.sh` builds the patched firmware tree; `export-patches.sh` writes the patches back out. `upstream.env` pins the vendor commit. |
-| `docs/screenshots/` | Screenshots used below. |
+| `tools/taixin-toolbox/` | Taixin toolbox: a desktop tool (Windows, macOS, Linux) that finds bridges over Ethernet, flashes firmware, resets settings, and talks to stock firmware's NETAT console and NETLOG stream. See its [README](tools/taixin-toolbox/README.md). |
+| `docs/` | [WNB OTA protocol](docs/wnb-ota-protocol.md) notes, and the screenshots used below. |
 
 Ready-built firmware is on the [releases page](https://github.com/aliosa27/taixin-halow-bridge/releases).
 
@@ -27,11 +28,22 @@ This firmware has been tested on:
 
 Use the `.bin` from a release, or your own `project/txw8301_v<ver>-<svn>_<date>_.bin` (the makecode output). Plain `txw8301.bin` has no OTA header and is rejected. Images are limited to 496 KB (`0x7C000`).
 
-Your saved WiFi, radio and IP settings are kept when you upgrade from the stock firmware or from an earlier release.
+Your saved WiFi, radio and IP settings are kept when you upgrade from stock v2.4.1.3 firmware or from an earlier release. Coming from another major version (for example v1.6.x), reset the settings as part of the upgrade (Taixin toolbox: **Reset settings**). If the saved settings leave the device with no WiFi mode or no IP address, the firmware drops them at boot and starts on its defaults.
+
+### First install: Taixin toolbox
+
+[Taixin toolbox](tools/taixin-toolbox/README.md) (Windows, macOS, Linux; download from the releases page) speaks the same Ethernet OTA protocol as Taixin's program:
+
+1. Connect the PC's Ethernet port to the device's Ethernet port, directly or through a switch, and pick that adapter at the top of the window.
+2. On **Firmware (OTA)**, press **Scan** and select the device. Bridges on the far side of a HaLow link answer too.
+3. Choose the `.bin` (the tool checks its header and chip ID), keep **Reboot when finished** ticked, and press **Flash**.
+4. When moving between major versions (for example stock v1.6.x to this v2.x firmware), also tick **Reset settings** so the device starts from defaults; the tool suggests it when the versions differ.
+
+The same tab has **Reset settings and reboot** to recover a device whose settings leave it unreachable.
 
 ### First install: Taixin's OTA program
 
-Devices still on stock firmware have no web UI, so the first install goes through Taixin's OTA program on a Windows PC. The firmware receives the image as Ethernet frames (`wnb_ota_init`, `SYS_APP_WNBOTA`), so the PC needs a wired connection to the device.
+Devices still on stock firmware have no web UI, so the first install can also go through Taixin's OTA program on a Windows PC. The firmware receives the image as Ethernet frames (`wnb_ota_init`, `SYS_APP_WNBOTA`), so the PC needs a wired connection to the device.
 
 1. Connect the PC's Ethernet port to the device's Ethernet port, directly or through a switch.
 2. Start the OTA program and select that Ethernet adapter.

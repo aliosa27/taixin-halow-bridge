@@ -109,9 +109,37 @@ pub fn ota_scan(dev: String, src: Mac, out: Out) {
     out.send(Msg::OtaScanDone);
 }
 
-const CHUNK: usize = 1024;
+// Timing follows github.com/I-AM-ENGINEER/RNode_Halow_OTA_Flasher (hgic_flash.py), which is
+// patient enough for far-end devices over the HaLow link.
+/// Data per FW_DATA frame: 34 header bytes + 1400 fits a 1514-byte Ethernet frame.
+const CHUNK: usize = 1400;
+/// Sends per chunk before the transfer is given up.
 const TRIES: u32 = 10;
-const RESP_TIMEOUT: Duration = Duration::from_millis(1000);
+/// Wait for a chunk's reply. A reply can be slow while the device erases a 4 KB sector,
+/// and longer when it comes back over HaLow.
+const RESP_TIMEOUT: Duration = Duration::from_millis(2500);
+/// Pause after a timeout before re-sending (the device may still be erasing).
+const RETRY_PAUSE: Duration = Duration::from_millis(250);
+/// A reply slower than this means the device was busy; pause before the next chunk.
+const SLOW_REPLY: Duration = Duration::from_millis(500);
+const SLOW_PAUSE: Duration = Duration::from_millis(100);
+/// Whole-transfer attempts. A failed session is dropped by the device, and off 0 starts
+/// a new one, so a transfer that dies part way is restarted from the beginning.
+const ATTEMPTS: u32 = 3;
+const ATTEMPT_PAUSE: Duration = Duration::from_secs(3);
+
+enum FlashErr {
+    /// Worth restarting the transfer from 0.
+    Retry(String),
+    /// Cancelled, or the device rejected the image itself.
+    Fatal(String),
+}
+
+impl From<String> for FlashErr {
+    fn from(e: String) -> Self {
+        FlashErr::Fatal(e)
+    }
+}
 
 /// Stop-and-wait upload (docs/wnb-ota-protocol.md). The last chunk commits the image.
 /// `reboot`: REBOOT flags to send afterwards, or None to leave the device running.
@@ -122,53 +150,35 @@ pub fn flash(dev: String, src: Mac, target: ScanReport, image: Vec<u8>, reboot: 
 
 fn flash_inner(dev: &str, src: Mac, t: &ScanReport, image: &[u8], reboot: Option<u32>, cancel: &AtomicBool, out: &Out) -> Result<(), String> {
     let cap = Capture::open(dev, &ota_filter(), READ_TIMEOUT)?;
-    let total = image.len() as u32;
     let started = Instant::now();
-    let mut retries = 0u32;
-    out.log(format!("Flashing {} bytes to {} ...", total, proto::mac_str(&t.mac)));
-
-    for (i, chunk) in image.chunks(CHUNK).enumerate() {
-        let off = (i * CHUNK) as u32;
-        let frame = proto::fw_data(&t.mac, &src, t.chipid, off, total, chunk);
-        let mut ok = false;
-        for attempt in 0..TRIES {
-            if cancel.load(Ordering::Relaxed) {
-                return Err(format!("cancelled at {off} bytes; the device keeps running its current firmware"));
-            }
-            if attempt > 0 {
-                retries += 1;
-            }
-            cap.send(&frame)?;
-            let deadline = Instant::now() + RESP_TIMEOUT;
-            while Instant::now() < deadline {
-                let Some(f) = cap.next()? else { continue };
-                let Some((stype, status)) = proto::parse_hdr(&f) else { continue };
-                if stype != proto::STYPE_FW_DATA_RESP || f.len() < 24 || f[6..12] != t.mac {
-                    continue;
+    let mut attempt = 1;
+    let retries = loop {
+        out.log(format!(
+            "Flashing {} bytes to {} (attempt {attempt} of {ATTEMPTS}) ...",
+            image.len(),
+            proto::mac_str(&t.mac)
+        ));
+        match send_image(&cap, src, t, image, cancel, out) {
+            Ok(r) => break r,
+            Err(FlashErr::Fatal(e)) => return Err(e),
+            Err(FlashErr::Retry(e)) if attempt < ATTEMPTS => {
+                out.log(format!("{e}; restarting from the beginning in {} s.", ATTEMPT_PAUSE.as_secs()));
+                out.send(Msg::Progress(0.0));
+                let until = Instant::now() + ATTEMPT_PAUSE;
+                while Instant::now() < until {
+                    if cancel.load(Ordering::Relaxed) {
+                        return Err(cancelled(0));
+                    }
+                    std::thread::sleep(Duration::from_millis(100));
                 }
-                if u32::from_be_bytes([f[20], f[21], f[22], f[23]]) != off {
-                    continue; // late reply to an earlier retry
-                }
-                if status != 0 {
-                    return Err(format!(
-                        "device rejected the chunk at {off} (status 0x{status:02x}): bad checksum, chip ID, or flash write"
-                    ));
-                }
-                ok = true;
-                break;
+                attempt += 1;
             }
-            if ok {
-                break;
-            }
+            Err(FlashErr::Retry(e)) => return Err(format!("{e} (gave up after {ATTEMPTS} attempts)")),
         }
-        if !ok {
-            return Err(format!("no reply at {off} bytes after {TRIES} tries"));
-        }
-        out.send(Msg::Progress((off as usize + chunk.len()) as f32 / total as f32));
-    }
+    };
 
     out.log(format!(
-        "Image written and verified in {:.1} s ({} retries).",
+        "Image written and verified in {:.1} s ({} chunk retries).",
         started.elapsed().as_secs_f32(),
         retries
     ));
@@ -182,6 +192,64 @@ fn flash_inner(dev: &str, src: Mac, t: &ScanReport, image: &[u8], reboot: Option
         out.log(reboot_msg(flags, "Scan again in about 10 s to see the new version."));
     }
     Ok(())
+}
+
+fn cancelled(off: u32) -> String {
+    format!("cancelled at {off} bytes; the device keeps running its current firmware")
+}
+
+/// One pass over the image. Returns the number of chunk re-sends.
+fn send_image(cap: &Capture, src: Mac, t: &ScanReport, image: &[u8], cancel: &AtomicBool, out: &Out) -> Result<u32, FlashErr> {
+    let total = image.len() as u32;
+    let mut retries = 0u32;
+
+    for (i, chunk) in image.chunks(CHUNK).enumerate() {
+        let off = (i * CHUNK) as u32;
+        let frame = proto::fw_data(&t.mac, &src, t.chipid, off, total, chunk);
+        let mut acked = None;
+        for attempt in 0..TRIES {
+            if cancel.load(Ordering::Relaxed) {
+                return Err(FlashErr::Fatal(cancelled(off)));
+            }
+            if attempt > 0 {
+                retries += 1;
+                std::thread::sleep(RETRY_PAUSE);
+            }
+            let sent = Instant::now();
+            cap.send(&frame)?;
+            let deadline = sent + RESP_TIMEOUT;
+            while Instant::now() < deadline {
+                let Some(f) = cap.next()? else { continue };
+                let Some((stype, status)) = proto::parse_hdr(&f) else { continue };
+                if stype != proto::STYPE_FW_DATA_RESP || f.len() < 24 || f[6..12] != t.mac {
+                    continue;
+                }
+                if u32::from_be_bytes([f[20], f[21], f[22], f[23]]) != off {
+                    continue; // late reply to an earlier retry
+                }
+                if status != 0 {
+                    let e = format!(
+                        "device rejected the chunk at {off} (status 0x{status:02x}): bad checksum, chip ID, or flash write"
+                    );
+                    // A rejected first chunk is the image itself (marker, customer ID);
+                    // later the device has dropped the session and a restart may work.
+                    return Err(if off == 0 { FlashErr::Fatal(e) } else { FlashErr::Retry(e) });
+                }
+                acked = Some(sent.elapsed());
+                break;
+            }
+            if acked.is_some() {
+                break;
+            }
+        }
+        match acked {
+            None => return Err(FlashErr::Retry(format!("no reply at {off} bytes after {TRIES} tries"))),
+            Some(d) if d > SLOW_REPLY => std::thread::sleep(SLOW_PAUSE),
+            Some(_) => {}
+        }
+        out.send(Msg::Progress((off as usize + chunk.len()) as f32 / total as f32));
+    }
+    Ok(retries)
 }
 
 fn reboot_msg(flags: u32, then: &str) -> String {

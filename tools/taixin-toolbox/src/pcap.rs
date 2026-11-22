@@ -104,7 +104,7 @@ fn load_lib() -> Result<Library, String> {
 
 #[cfg(not(windows))]
 fn load_lib() -> Result<Library, String> {
-    let names = ["libpcap.dylib", "libpcap.A.dylib", "libpcap.so.1", "libpcap.so"];
+    let names = ["libpcap.dylib", "libpcap.A.dylib", "libpcap.so.1", "libpcap.so.0.8", "libpcap.so"];
     for n in names {
         if let Ok(l) = unsafe { Library::new(n) } {
             return Ok(l);

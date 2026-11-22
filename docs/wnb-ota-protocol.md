@@ -110,29 +110,31 @@ checksum = ~sum & 0xffff        // stored big-endian at offset 30
    - it starts with `69 5A`
    - its size is at most `0x7C000`
    - the chip ID in its firmware-info header matches the report
-4. For each chunk, send FW_DATA and wait for the FW_DATA_RESP with the same `off`: stop-and-wait, a timeout of about 300 ms, about 10 retries. Abort on status 0xFF.
+4. For each chunk, send FW_DATA and wait for the FW_DATA_RESP with the same `off` (stop-and-wait). The tool uses 1400-byte chunks, waits 2.5 s per send, pauses 0.25 s before a re-send and 0.1 s after a reply slower than 0.5 s, and sends each chunk up to 10 times; a reply can take a while when the device erases a sector or answers over HaLow. On status 0xFF or no reply the device has dropped the session: restart from `off` 0 (the tool does this up to 3 times, 3 s apart), except when the first chunk is rejected, which means the image itself is refused.
 5. Send REBOOT (flags 0). Re-scan after about 10 s to confirm the new version.
    - **Between major versions** (for example v1.6.x to v2.x), send flags 1 instead. The old firmware is still running at this point, so it clears its own settings (`syscfg_loaddef("syscfg")`: zeroes the magic of both copies in the last two flash sectors) and the new firmware boots on its defaults. This only helps when both versions keep their settings in the same place; this firmware also rejects an unusable saved config at boot (see `syscfg_check` in `project/syscfg.c`).
 
 ## Tool
 
-`tools/wnb-ota` is a cross-platform (Windows/macOS) Rust implementation. It loads Npcap (`wpcap.dll`) or the system libpcap at run time.
+`tools/taixin-toolbox` (Taixin toolbox) is a cross-platform (Windows, macOS, Linux) Rust implementation; see its README. It loads Npcap (`wpcap.dll`) or the system libpcap at run time.
 
-The tool has three tabs:
+The tool has four tabs:
 
 - **Firmware (OTA):** scan, check a `.bin` (boot marker, size, chip ID against the selected device), flash with progress and cancel, reboot. "Reset settings" makes the reboot after flashing use flags 1, and the tool suggests it when the major version changes. "Reset settings and reboot" does the same without flashing.
 - **NETAT console:** the vendor's AT-over-UDP broadcast (port 56789).
 - **NETLOG:** the vendor's log stream (port 64320, heartbeat every 500 ms).
+- **About:** version, commit and build date, source links, credits, and where to report issues (the same links as the firmware's About page).
 
 NETAT and NETLOG frame layouts come from [taixin_tools](https://github.com/aliosa27/taixin_tools) (`docs/netat_protocol.md`, `docs/netlog_protocol.md`). They are sent as raw broadcast frames from the adapter's IPv4 address (or 0.0.0.0). Both services are off in this project's firmware, so they only answer on stock firmware.
 
-Verified on hardware (2026-11-21): OTA discovery. Not yet tested on hardware: flashing, NETAT, NETLOG.
+Verified on hardware (2026-11-21): OTA discovery, flashing, reset settings. Not yet tested on hardware: NETAT, NETLOG (they need a device on stock firmware), flashing over the HaLow link.
 
 ### Building
 
 ```sh
-cd tools/wnb-ota
-cargo build --release          # GUI: target/release/wnb-ota(.exe)
+cd tools/taixin-toolbox
+cargo build --release          # GUI: target/release/taixin-toolbox(.exe)
+cargo run -- --version         # console: version, commit, build date
 cargo run -- --list            # console: list capture adapters
 cargo run -- --scan <n>        # console: OTA scan on adapter n
 cargo run -- --netat-scan <n>  # console: NETAT scan
@@ -142,3 +144,5 @@ cargo run -- --netat <n> <mac> AT+VERSION
 - **Windows:** needs [Npcap](https://npcap.com) at run time.
   - With the `x86_64-pc-windows-gnu` toolchain, the build also needs MinGW binutils (`dlltool` and `as`) on `PATH`, because several dependencies use raw-dylib imports. The MSVC toolchain does not need them.
 - **macOS:** uses the system libpcap. Run with `sudo`, or give your user access to `/dev/bpf*` (e.g. Wireshark's ChmodBPF).
+- **Linux:** needs `libpcap.so.1` (package `libpcap0.8` or `libpcap`) and raw-socket access: run with `sudo`, or `sudo setcap cap_net_raw,cap_net_admin+ep taixin-toolbox`.
+- **CI:** `.github/workflows/taixin-toolbox.yml` builds Windows x86_64, macOS universal (Apple Silicon + Intel) and Linux x86_64 on every push that touches the tool. Pushing a tag `toolbox-v*` (e.g. `toolbox-v0.2.0`) also publishes the three archives as a GitHub release.

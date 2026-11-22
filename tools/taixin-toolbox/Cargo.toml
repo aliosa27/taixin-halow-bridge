@@ -1,8 +1,8 @@
 [package]
-name = "wnb-ota"
-version = "0.1.0"
+name = "taixin-toolbox"
+version = "0.2.0"
 edition = "2021"
-description = "Find and update Taixin TXW8301 HaLow bridges over Ethernet (WNB OTA protocol)"
+description = "Find, flash and debug Taixin TXW8301 HaLow bridges: Ethernet OTA, NETAT console, NETLOG viewer"
 license = "Apache-2.0"
 
 [dependencies]
