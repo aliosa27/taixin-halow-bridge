@@ -59,8 +59,35 @@ Open **Firmware**, choose the `.bin`, and press **Upload**. Confirm "Are you sur
 ### Finding the device
 
 - The device gets its address over DHCP. It sends the host name `<device name>-<last 6 MAC hex digits>`, for example `tx-7358c8`, so look for that name in your router's lease list.
-- With no DHCP lease after 60 seconds, the device uses 192.168.123.1 (255.255.255.0) and keeps asking for a lease. On the station side with no HaLow link, it also hands out addresses (192.168.123.100–200, 2-minute leases), so a PC cabled straight to it gets one on its own; otherwise give your PC an address in 192.168.123.0/24. Then open http://192.168.123.1.
+- With no DHCP server, use the fallback address http://192.168.123.1 (see below).
 - The default web password is `admin`.
+- [Taixin toolbox](tools/taixin-toolbox/README.md) finds the device over Ethernet without any IP address (**Firmware (OTA)** → **Scan**).
+
+### Fallback address and DHCP server
+
+With DHCP on (the default), the device falls back to a fixed address when no DHCP server answers, so the web UI stays reachable:
+
+1. **After 60 seconds without a lease**, the device takes **192.168.123.1** (netmask 255.255.255.0, no gateway). It keeps asking for a lease, and a lease replaces the fallback address.
+2. **On the station side with no HaLow link**, it also runs a **DHCP server** on that address:
+   - It hands out 192.168.123.100–200, with 192.168.123.1 as router and DNS, on 2-minute leases.
+   - A PC cabled straight to the device gets an address by itself. Open http://192.168.123.1.
+   - The server stops as soon as the HaLow link comes up or a lease arrives, so it never competes with your router's DHCP server across the bridge.
+   - The short leases move the PC to your real network within about 2 minutes.
+3. **On the access point side, or while the link is up**, nothing is served. Give your PC an address in 192.168.123.0/24 (for example 192.168.123.10) to reach the device.
+
+With a static address (LAN / IP page) there is no fallback. The device keeps the address you set.
+
+### NETAT and NETLOG are off
+
+Stock Taixin firmware runs two UDP broadcast services for Taixin's PC tools: **NETAT** (AT commands over the network) and **NETLOG** (the device log over the network). This firmware turns both off to save SRAM. They are replaced by the web UI's **Debug** page, which has an AT console and a live device log.
+
+- **Taixin's PC tools:** Taixin's NETAT and NETLOG programs get no answer from a device on this firmware. So do the **NETAT console** and **NETLOG** tabs of Taixin toolbox; those tabs are for devices still on stock firmware.
+- **Still on:**
+  - Ethernet OTA flashing (Taixin's OTA program, and Taixin toolbox's **Firmware (OTA)** tab).
+  - AT commands on the serial UART.
+- **To turn them back on**, set `SYS_APP_NETAT 1` and/or `SYS_APP_NETLOG 1` in `TXW8301_WNB/project/project_config.h` and rebuild.
+  - Cost: about 0.6 KB for NETAT and 0.8 KB for NETLOG.
+  - With NETLOG on, the Debug page's device log is not available, because both use the same log hook.
 
 ## Web UI
 
@@ -105,7 +132,7 @@ Open **Firmware**, choose the `.bin`, and press **Upload**. Confirm "Are you sur
 
 ![LAN / IP, DHCP](docs/screenshots/lan-dhcp.png)
 
-With DHCP, the page explains the fallback to 192.168.123.1.
+With DHCP, the page explains the fallback to 192.168.123.1 (see [Fallback address and DHCP server](#fallback-address-and-dhcp-server)).
 
 ![LAN / IP, static](docs/screenshots/lan-static.png)
 
@@ -176,7 +203,7 @@ CDK rewrites `txw4002a.mk`, `cdkws.mk`, `*.cdkws` and `*.modify.bat` on every op
 - TX power, power boost and extra ACK timeout are saved in the config and applied at boot.
 - `AT+SYSCFG` and the new `AT+SCAN?` reply through the AT channel.
 - AT commands can be typed in a serial terminal (UART1, 115200 8N1): input is echoed, Backspace works, and Enter runs the line. Tools that send whole lines work as before.
-- Removed to save SRAM: `AT+PING`/`AT+IPERF2` (~6 KB), and the network log and network AT services (replaced by the Debug page).
+- Removed to save SRAM: `AT+PING`/`AT+IPERF2` (~6 KB), and the NETAT and NETLOG network services (replaced by the Debug page; see [NETAT and NETLOG are off](#netat-and-netlog-are-off)).
 
 Defaults to change before shipping a product: WiFi passphrase `12345678`, web password `admin`.
 
