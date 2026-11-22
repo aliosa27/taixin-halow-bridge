@@ -1,7 +1,7 @@
 From 174c4cfc72aac1291ec816c422cd7b6970e83e3d Mon Sep 17 00:00:00 2001
 From: aliosa27 <aliosa27@aliosa27.me>
 Date: Wed, 18 Nov 2026 19:41:45 -0800
-Subject: [PATCH 03/26] Drop AT+PING and AT+IPERF2 to free ~6 KB of SRAM; fix
+Subject: [PATCH 03/27] Drop AT+PING and AT+IPERF2 to free ~6 KB of SRAM; fix
  MAC wrap
 
 - SYS_ATCMD_NETTEST (project_config.h, default 0) gates both commands,

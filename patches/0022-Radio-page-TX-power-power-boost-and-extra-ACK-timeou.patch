@@ -1,7 +1,7 @@
 From fc35bbc3b95c48c8cf95db2c8dc746c89f03c196 Mon Sep 17 00:00:00 2001
 From: aliosa27 <aliosa27@aliosa27.me>
 Date: Fri, 20 Nov 2026 17:59:24 -0800
-Subject: [PATCH 22/26] Radio page: TX power, power boost and extra ACK timeout
+Subject: [PATCH 22/27] Radio page: TX power, power boost and extra ACK timeout
  (distance slider), saved and applied at boot
 
 ---

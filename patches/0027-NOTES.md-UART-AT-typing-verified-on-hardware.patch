@@ -1,0 +1,22 @@
+From 3bb48dff0ef54cfb4463654497db774ca9d814dc Mon Sep 17 00:00:00 2001
+From: aliosa27 <aliosa27@aliosa27.me>
+Date: Sun, 22 Nov 2026 09:38:28 -0800
+Subject: [PATCH 27/27] NOTES.md: UART AT typing verified on hardware
+
+---
+ NOTES.md | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/NOTES.md b/NOTES.md
+index 607d393..9395ea1 100644
+--- a/NOTES.md
++++ b/NOTES.md
+@@ -112,7 +112,7 @@ The replacement keeps libatcmd's buffer (1,032 bytes, heap) and gap, and sorts t
+   - CR or LF runs it.
+   - The LF of a CR LF and empty lines run nothing.
+ 
+-It adds ~0.25 KB of code net of the dropped `atcmd_atcmd_uart.o`. Not yet tested on hardware: typing, `AT+FWUPG`.
++It adds ~0.25 KB of code net of the dropped `atcmd_atcmd_uart.o`. Typing verified on hardware (2026-11-22). Not yet tested on hardware: `AT+FWUPG`.
+ 
+ ## AT reply gaps (found 2026-11-18, not fixed yet)
+ 
