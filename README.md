@@ -20,7 +20,7 @@ This firmware has been tested on:
 
 - [LILYGO T-Halow](https://lilygo.cc/products/t-halow)
 - [LILYGO T-Halow RJ45](https://lilygo.cc/products/t-halow-rj45)
-- [HaLow bridge with Ethernet and USB-C (Amazon B0GZNNHVK7)](https://www.amazon.com/dp/B0GZNNHVK7). Both Ethernet and USB-C networking work.
+- [Yolefarise WiFi HaLow HTB01](https://www.amazon.com/dp/B0GZNNHVK7). Both Ethernet and USB-C networking work.
 - Most Taixin TXW8301 HaLow Ethernet bridges
 - [Anjielo HaLow Ethernet bridge kit](https://anjielo.com/products/wireless-signal-wall-through-ethernet-air-connector-port-bridge-kit-outdoor-long-distance-up-to-1000-meters-transmitter-receiver?variant=43940661362905)
 - [Anjielo HaLow Wi-Fi extender](https://anjielo.com/products/anjielosmart-ah-wifi-halow-extender-long-distance-wi-fi-outdoor-ap-extender-powerful-high-gain-2-4-5g-antenna-wifi-range-extender-amplifier). This firmware has not been tested on its receiver unit (the side with the 2.4/5 GHz Wi-Fi access point). That unit, on its stock firmware, connects to a device running this firmware in WNB Access Point mode.
