@@ -114,12 +114,13 @@ const TRIES: u32 = 10;
 const RESP_TIMEOUT: Duration = Duration::from_millis(1000);
 
 /// Stop-and-wait upload (docs/wnb-ota-protocol.md). The last chunk commits the image.
-pub fn flash(dev: String, src: Mac, target: ScanReport, image: Vec<u8>, reboot: bool, cancel: Arc<AtomicBool>, out: Out) {
+/// `reboot`: REBOOT flags to send afterwards, or None to leave the device running.
+pub fn flash(dev: String, src: Mac, target: ScanReport, image: Vec<u8>, reboot: Option<u32>, cancel: Arc<AtomicBool>, out: Out) {
     let r = flash_inner(&dev, src, &target, &image, reboot, &cancel, &out);
     out.send(Msg::FlashDone(r));
 }
 
-fn flash_inner(dev: &str, src: Mac, t: &ScanReport, image: &[u8], reboot: bool, cancel: &AtomicBool, out: &Out) -> Result<(), String> {
+fn flash_inner(dev: &str, src: Mac, t: &ScanReport, image: &[u8], reboot: Option<u32>, cancel: &AtomicBool, out: &Out) -> Result<(), String> {
     let cap = Capture::open(dev, &ota_filter(), READ_TIMEOUT)?;
     let total = image.len() as u32;
     let started = Instant::now();
@@ -171,24 +172,34 @@ fn flash_inner(dev: &str, src: Mac, t: &ScanReport, image: &[u8], reboot: bool, 
         started.elapsed().as_secs_f32(),
         retries
     ));
-    if reboot {
+    if let Some(flags) = reboot {
+        // The old firmware is still running and handles this, so with LOADDEF it is the
+        // old firmware that clears the settings; the new one then boots on defaults.
         for _ in 0..3 {
-            cap.send(&proto::reboot(&t.mac, &src, 0))?;
+            cap.send(&proto::reboot(&t.mac, &src, flags))?;
             std::thread::sleep(Duration::from_millis(100));
         }
-        out.log("Reboot sent. Scan again in about 10 s to see the new version.");
+        out.log(reboot_msg(flags, "Scan again in about 10 s to see the new version."));
     }
     Ok(())
 }
 
-pub fn reboot(dev: String, src: Mac, mac: Mac, out: Out) {
+fn reboot_msg(flags: u32, then: &str) -> String {
+    if flags & proto::REBOOT_LOADDEF != 0 {
+        format!("Reboot with settings reset sent. {then} The device comes back on its defaults (AP mode, 192.168.123.1 or DHCP); boards without a factory MAC get a new one.")
+    } else {
+        format!("Reboot sent. {then}")
+    }
+}
+
+pub fn reboot(dev: String, src: Mac, mac: Mac, flags: u32, out: Out) {
     if let Some(cap) = open(&out, &dev, &ota_filter()) {
         let r = (0..3).try_for_each(|_| {
             std::thread::sleep(Duration::from_millis(50));
-            cap.send(&proto::reboot(&mac, &src, 0))
+            cap.send(&proto::reboot(&mac, &src, flags))
         });
         match r {
-            Ok(()) => out.log(format!("Reboot sent to {}.", proto::mac_str(&mac))),
+            Ok(()) => out.log(reboot_msg(flags, &format!("({})", proto::mac_str(&mac)))),
             Err(e) => out.log(format!("Reboot failed: {e}")),
         }
     }

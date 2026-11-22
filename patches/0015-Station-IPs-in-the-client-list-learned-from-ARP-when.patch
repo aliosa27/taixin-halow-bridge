@@ -1,7 +1,7 @@
 From 73aabbf6119824864b6968c3ec9481102d680268 Mon Sep 17 00:00:00 2001
 From: aliosa27 <aliosa27@aliosa27.me>
 Date: Fri, 20 Nov 2026 10:20:59 -0800
-Subject: [PATCH 15/24] Station IPs in the client list learned from ARP when
+Subject: [PATCH 15/25] Station IPs in the client list learned from ARP when
  the AP has no DHCP lease
 
 ---

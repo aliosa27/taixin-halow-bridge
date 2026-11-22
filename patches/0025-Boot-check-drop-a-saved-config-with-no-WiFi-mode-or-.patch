@@ -1,0 +1,61 @@
+From 976ea28e205457a2c7deccbd37fb7bfaa645f7a2 Mon Sep 17 00:00:00 2001
+From: aliosa27 <aliosa27@aliosa27.me>
+Date: Sat, 21 Nov 2026 20:49:55 -0800
+Subject: [PATCH 25/25] Boot check: drop a saved config with no WiFi mode or a
+ zero static IP; notes on settings storage
+
+---
+ NOTES.md         |  7 +++++++
+ project/syscfg.c | 19 ++++++++++++++++++-
+ 2 files changed, 25 insertions(+), 1 deletion(-)
+
+diff --git a/NOTES.md b/NOTES.md
+index 0008341..90fd383 100644
+--- a/NOTES.md
++++ b/NOTES.md
+@@ -65,6 +65,13 @@ Taixin TXW8301 (TXW4002A, C-SKY CK803) HaLow wireless-bridge (WNB) firmware SDK
+ - Ruled out in `webui.c`: request/reply buffers are freed on every path; the log tail uses a static ring. lwIP PCBs come from static memp pools. `sys_dbginfo_print`/`AT+SYSDBG heap 1` print from the stack.
+ - Remaining suspects: `g_at_buf` (2 KB, `WEBUI_AT_BUF`) is allocated on the first web AT command and never freed, by design so far; lwIP send data (`TCP_SND_BUF` 4×1460, from the heap via `MEM_LIBC_MALLOC=1`) held by connections still retransmitting after 1 s polling over WiFi; allocations in the closed libs. Next step: check whether heap recovers after a few idle minutes, and capture one `AT+SYSDBG heap 1` dump through the Device log (it lists allocations by function and line).
+ 
++## Settings storage and the boot check
++
++- `syscfg` lives in the last two 4 KB sectors (copies A 0xFE000, B 0xFF000), `webcfg` in the two below. Each copy: magic 0x1234, CRC, size, then the struct. `syscfg_write` writes the other copy and then zeroes the old copy's magic, so `syscfg: invalid magic_num=0` for one copy at boot is normal. `syscfg_loaddef` zeroes both magics; OTA REBOOT flags bit 0 calls it.
++- `sys_cfgs` defaults come from its initializer in `syscfg.c` (`.data`); `syscfg_read` leaves the struct untouched on failure.
++- `syscfg_check` (boot, right after `sys_cfg_load`): a saved config with mode 0 / above `WIFI_MODE_AP_WNBAP`, or static addressing with IP or netmask 0, is dropped with `syscfg_loaddef` + reset, and the next boot takes the defaults (which pass). Not restored in place because `.rodata` is loaded into SRAM too, so a const copy of the defaults would cost 340 bytes of RAM. Bandwidth and channel list are not checked (0 = fill in for the module).
++- Incident 2026-11-21: after a wnb-ota flash of the 11.20 build, the AP booted on a valid (CRC OK) config with mode 0, static 0.0.0.0, KEYMGMT 0 and MAC c8:23:18:24:00:00, so it was unreachable. Not the OTA write (erase stops at 0xF4000) or the REBOOT (flags 0), and not defaults ("use default params." absent). The device itself saved a corrupted `sys_cfgs` (callers: web settings save, pair/unpair events). Cause still open; a dump of 0xFC000-0xFFFFF would show which build wrote it (size field) and how it is damaged.
++
+ ## Parked ideas (each broke boot; all reverted)
+ 
+ When these were parked, the known-good page was 49,693 bytes (gzip). Two builds failed to boot:
+diff --git a/project/syscfg.c b/project/syscfg.c
+index 3b099d2..6f971c9 100644
+--- a/project/syscfg.c
++++ b/project/syscfg.c
+@@ -217,9 +217,26 @@ void syscfg_set_default_val()
+     //os_printf("txpower init:%d\r\n",sys_cfgs.txpower);
+ }
+ 
++/* A saved config that leaves the device unreachable (no WiFi role, or static
++ * addressing with no address) is dropped: invalidate it and reboot, and the next
++ * boot takes the defaults above, which pass this check. (Bandwidth and channel
++ * list are not checked: 0 there means "fill in for this module".) Resetting
++ * instead of restoring in place keeps the defaults out of RAM: .rodata is
++ * loaded into SRAM on this chip. */
+ void syscfg_check(void)
+ {
+-    return;
++    const char *bad = NULL;
++
++    if (sys_cfgs.wifi_mode == WIFI_MODE_NONE || sys_cfgs.wifi_mode > WIFI_MODE_AP_WNBAP) {
++        bad = "wifi mode";
++    } else if (!sys_cfgs.dhcpc_en && (sys_cfgs.ipaddr == 0 || sys_cfgs.netmask == 0)) {
++        bad = "static IP";
++    }
++    if (bad) {
++        os_printf("syscfg: bad %s, load defaults\r\n", bad);
++        syscfg_loaddef("syscfg");
++        mcu_reset();
++    }
+ }
+ 
+ int32 wificfg_flush(uint8 ifidx)

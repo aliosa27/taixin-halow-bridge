@@ -1,7 +1,7 @@
 From a5f51cf27ed109b9f761d133b91859c76c0b05b7 Mon Sep 17 00:00:00 2001
 From: aliosa27 <aliosa27@aliosa27.me>
 Date: Fri, 20 Nov 2026 21:48:15 -0800
-Subject: [PATCH 24/24] Status: station count on the AP side (conn_state field
+Subject: [PATCH 24/25] Status: station count on the AP side (conn_state field
  10), compact Ethernet frame counters
 
 ---

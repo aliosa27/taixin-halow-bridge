@@ -1,7 +1,7 @@
 From 6b946bad9a95c70719cbc614a2d5a86a56faf49c Mon Sep 17 00:00:00 2001
 From: aliosa27 <aliosa27@aliosa27.me>
 Date: Fri, 20 Nov 2026 10:46:08 -0800
-Subject: [PATCH 16/24] NOTES.md: DHCP host name verified on hardware
+Subject: [PATCH 16/25] NOTES.md: DHCP host name verified on hardware
 
 ---
  NOTES.md | 2 +-

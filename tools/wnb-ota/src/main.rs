@@ -52,7 +52,9 @@ struct App {
     fw_data: Option<Vec<u8>>,
     fw_info: Result<fwfile::FwInfo, String>,
     reboot_after: bool,
+    load_defaults: bool,
     confirm_flash: bool,
+    confirm_reset: bool,
     flashing: Option<Arc<AtomicBool>>,
     progress: f32,
     flash_result: Option<Result<(), String>>,
@@ -93,7 +95,9 @@ impl App {
             fw_data: None,
             fw_info: Err(String::new()),
             reboot_after: true,
+            load_defaults: false,
             confirm_flash: false,
+            confirm_reset: false,
             flashing: None,
             progress: 0.0,
             flash_result: None,
@@ -288,6 +292,17 @@ impl App {
         if let Some(m) = &mismatch {
             ui.colored_label(ui.visuals().error_fg_color, m);
         }
+        // Settings saved by one major version (v1.6.x) are not laid out like the next (v2.x).
+        let major_change = match (&target, &self.fw_info) {
+            (Some(t), Ok(f)) => (t.version >> 24) != (f.sdk_version >> 24),
+            _ => false,
+        };
+        if major_change && !self.load_defaults {
+            ui.colored_label(
+                egui::Color32::from_rgb(0xd0, 0x8a, 0x00),
+                "Major version change: tick \"Reset settings\" so the new firmware starts from its defaults.",
+            );
+        }
 
         ui.add_space(6.0);
         ui.horizontal(|ui| {
@@ -296,14 +311,29 @@ impl App {
                 self.confirm_flash = true;
             }
             ui.add_enabled(!flashing, egui::Checkbox::new(&mut self.reboot_after, "Reboot when finished"));
+            ui.add_enabled(
+                !flashing && self.reboot_after,
+                egui::Checkbox::new(&mut self.load_defaults, "Reset settings"),
+            )
+            .on_hover_text(
+                "Reboot with the load-defaults flag: the device forgets its settings (name, keys, \
+                 IP, pairing) and starts from the firmware defaults (this firmware: AP mode, \
+                 192.168.123.1 or a DHCP address; boards without a factory MAC get a new one). \
+                 Use it when moving between major versions.",
+            );
             if let Some(cancel) = &self.flashing {
                 if ui.button("Cancel").clicked() {
                     cancel.store(true, Ordering::Relaxed);
                 }
             }
+        });
+        ui.horizontal(|ui| {
             if ui.add_enabled(target.is_some() && !flashing, egui::Button::new("Reboot device")).clicked() {
                 let (dev, src, mac) = (self.dev().unwrap().name.clone(), self.src, target.as_ref().unwrap().mac);
-                self.spawn(move |o| work::reboot(dev, src, mac, o));
+                self.spawn(move |o| work::reboot(dev, src, mac, 0, o));
+            }
+            if ui.add_enabled(target.is_some() && !flashing, egui::Button::new("Reset settings and reboot")).clicked() {
+                self.confirm_reset = true;
             }
         });
 
@@ -333,6 +363,12 @@ impl App {
                         ui.label(format!("Device: {}  ({}, {})", mac_str(&t.mac), t.version_str(), t.mode_str()));
                         ui.label(format!("New firmware: {}", f.version_str()));
                         ui.label("The device keeps running its current firmware until the image is complete and verified.");
+                        if self.reboot_after && self.load_defaults {
+                            ui.colored_label(
+                                egui::Color32::from_rgb(0xd0, 0x8a, 0x00),
+                                "Settings will be reset: the device comes back on its defaults (AP mode, 192.168.123.1 or DHCP).",
+                            );
+                        }
                     }
                     ui.horizontal(|ui| {
                         if ui.button("Flash").clicked() {
@@ -341,7 +377,9 @@ impl App {
                                 self.flashing = Some(cancel.clone());
                                 self.progress = 0.0;
                                 self.flash_result = None;
-                                let (dev, src, reboot) = (self.dev().unwrap().name.clone(), self.src, self.reboot_after);
+                                let flags = if self.load_defaults { proto::REBOOT_LOADDEF } else { 0 };
+                                let reboot = self.reboot_after.then_some(flags);
+                                let (dev, src) = (self.dev().unwrap().name.clone(), self.src);
                                 self.spawn(move |o| work::flash(dev, src, t, data, reboot, cancel, o));
                             }
                             self.confirm_flash = false;
@@ -353,6 +391,37 @@ impl App {
                 });
             if !open {
                 self.confirm_flash = false;
+            }
+        }
+
+        if self.confirm_reset {
+            let mut open = true;
+            egui::Window::new("Reset settings?")
+                .collapsible(false)
+                .resizable(false)
+                .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
+                .open(&mut open)
+                .show(ui.ctx(), |ui| {
+                    if let Some(t) = &target {
+                        ui.label(format!("Device: {}  ({}, {})", mac_str(&t.mac), t.version_str(), t.mode_str()));
+                    }
+                    ui.label("The device forgets all settings (name, keys, IP, pairing) and reboots on its defaults:");
+                    ui.label("AP mode, 192.168.123.1 or a DHCP address. Boards without a factory MAC get a new one.");
+                    ui.horizontal(|ui| {
+                        if ui.button("Reset and reboot").clicked() {
+                            if let Some(t) = &target {
+                                let (dev, src, mac) = (self.dev().unwrap().name.clone(), self.src, t.mac);
+                                self.spawn(move |o| work::reboot(dev, src, mac, proto::REBOOT_LOADDEF, o));
+                            }
+                            self.confirm_reset = false;
+                        }
+                        if ui.button("Cancel").clicked() {
+                            self.confirm_reset = false;
+                        }
+                    });
+                });
+            if !open {
+                self.confirm_reset = false;
             }
         }
     }

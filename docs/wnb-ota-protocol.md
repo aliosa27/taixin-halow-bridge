@@ -112,6 +112,7 @@ checksum = ~sum & 0xffff        // stored big-endian at offset 30
    - the chip ID in its firmware-info header matches the report
 4. For each chunk, send FW_DATA and wait for the FW_DATA_RESP with the same `off`: stop-and-wait, a timeout of about 300 ms, about 10 retries. Abort on status 0xFF.
 5. Send REBOOT (flags 0). Re-scan after about 10 s to confirm the new version.
+   - **Between major versions** (for example v1.6.x to v2.x), send flags 1 instead. The old firmware is still running at this point, so it clears its own settings (`syscfg_loaddef("syscfg")`: zeroes the magic of both copies in the last two flash sectors) and the new firmware boots on its defaults. This only helps when both versions keep their settings in the same place; this firmware also rejects an unusable saved config at boot (see `syscfg_check` in `project/syscfg.c`).
 
 ## Tool
 
@@ -119,7 +120,7 @@ checksum = ~sum & 0xffff        // stored big-endian at offset 30
 
 The tool has three tabs:
 
-- **Firmware (OTA):** scan, check a `.bin` (boot marker, size, chip ID against the selected device), flash with progress and cancel, reboot.
+- **Firmware (OTA):** scan, check a `.bin` (boot marker, size, chip ID against the selected device), flash with progress and cancel, reboot. "Reset settings" makes the reboot after flashing use flags 1, and the tool suggests it when the major version changes. "Reset settings and reboot" does the same without flashing.
 - **NETAT console:** the vendor's AT-over-UDP broadcast (port 56789).
 - **NETLOG:** the vendor's log stream (port 64320, heartbeat every 500 ms).
 

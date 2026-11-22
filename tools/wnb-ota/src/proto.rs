@@ -38,6 +38,8 @@ pub fn scan(src: &Mac) -> Vec<u8> {
     pad(header(&BROADCAST, src, STYPE_SCAN))
 }
 
+/// REBOOT flag: the running firmware runs `syscfg_loaddef("syscfg")` before resetting.
+pub const REBOOT_LOADDEF: u32 = 1;
 
 /// flags bit 0 = load factory defaults first. The device reads this field little-endian.
 pub fn reboot(dst: &Mac, src: &Mac, flags: u32) -> Vec<u8> {
