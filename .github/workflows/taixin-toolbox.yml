@@ -109,8 +109,11 @@ jobs:
           path: dist
           merge-multiple: true
 
+      - id: ver
+        run: echo "v=${GITHUB_REF_NAME#toolbox-v}" >> "$GITHUB_OUTPUT"
+
       - uses: softprops/action-gh-release@v2
         with:
-          name: ${{ startsWith(github.ref_name, 'toolbox-v') && format('Taixin toolbox {0}', github.ref_name) || github.ref_name }}
+          name: ${{ startsWith(github.ref_name, 'toolbox-v') && format('Taixin toolbox v{0}', steps.ver.outputs.v) || github.ref_name }}
           files: dist/*
           generate_release_notes: true
