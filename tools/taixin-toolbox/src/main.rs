@@ -2,6 +2,7 @@
 #![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]
 
 mod fwfile;
+mod icon;
 mod pcap;
 mod proto;
 mod udpproto;
@@ -845,7 +846,10 @@ fn main() -> eframe::Result<()> {
         return Ok(());
     }
     let options = eframe::NativeOptions {
-        viewport: egui::ViewportBuilder::default().with_inner_size([860.0, 600.0]).with_title(format!("Taixin toolbox {}", env!("CARGO_PKG_VERSION"))),
+        viewport: egui::ViewportBuilder::default()
+            .with_inner_size([860.0, 600.0])
+            .with_title(format!("Taixin toolbox {}", env!("CARGO_PKG_VERSION")))
+            .with_icon(egui::IconData { rgba: icon::rgba(64), width: 64, height: 64 }),
         ..Default::default()
     };
     eframe::run_native(

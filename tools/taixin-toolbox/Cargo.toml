@@ -14,3 +14,6 @@ rfd = "0.15"
 opt-level = "s"
 lto = true
 strip = true
+
+[build-dependencies]
+embed-resource = "2.5.1"
