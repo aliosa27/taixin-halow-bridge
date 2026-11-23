@@ -127,6 +127,15 @@ fn about_tab(ui: &mut egui::Ui) {
 /// Text kept in the console and log views.
 const TEXT_MAX: usize = 200_000;
 
+/// Green for "done"/"live" labels, readable on both the light and the dark theme.
+fn ok_color(ui: &egui::Ui) -> egui::Color32 {
+    if ui.visuals().dark_mode {
+        egui::Color32::from_rgb(0x5c, 0xd0, 0x6e)
+    } else {
+        egui::Color32::from_rgb(0x2e, 0xa0, 0x43)
+    }
+}
+
 fn push_capped(buf: &mut String, s: &str) {
     buf.push_str(s);
     if buf.len() > TEXT_MAX {
@@ -176,6 +185,7 @@ struct App {
     nl_target: Option<usize>,
     nl_stream: Option<Arc<AtomicBool>>,
     nl_text: String,
+    nl_popout: bool, // NETLOG shown in its own window, so NETAT can be used beside it
 }
 
 impl App {
@@ -215,6 +225,7 @@ impl App {
             nl_target: None,
             nl_stream: None,
             nl_text: String::new(),
+            nl_popout: false,
         };
         app.refresh();
         app
@@ -401,7 +412,7 @@ impl App {
         };
         if major_change && !self.load_defaults {
             ui.colored_label(
-                egui::Color32::from_rgb(0xd0, 0x8a, 0x00),
+                ui.visuals().warn_fg_color,
                 "Major version change: tick \"Reset settings\" so the new firmware starts from its defaults.",
             );
         }
@@ -444,7 +455,7 @@ impl App {
         }
         match &self.flash_result {
             Some(Ok(())) => {
-                ui.colored_label(egui::Color32::from_rgb(0x2e, 0xa0, 0x43), "Firmware written and verified.");
+                ui.colored_label(ok_color(ui), "Firmware written and verified.");
             }
             Some(Err(e)) => {
                 ui.colored_label(ui.visuals().error_fg_color, e);
@@ -467,7 +478,7 @@ impl App {
                         ui.label("The device keeps running its current firmware until the image is complete and verified.");
                         if self.reboot_after && self.load_defaults {
                             ui.colored_label(
-                                egui::Color32::from_rgb(0xd0, 0x8a, 0x00),
+                                ui.visuals().warn_fg_color,
                                 "Settings will be reset: the device comes back on its defaults (AP mode, 192.168.123.1 or DHCP).",
                             );
                         }
@@ -553,15 +564,19 @@ impl App {
         });
         ui.add_space(4.0);
 
-        let input_h = 34.0;
-        egui::ScrollArea::vertical()
-            .id_salt("at_out")
-            .stick_to_bottom(true)
-            .max_height((ui.available_height() - input_h).max(80.0))
-            .show(ui, |ui| {
+        // Command row pinned to the bottom; the output fills the space above it.
+        egui::TopBottomPanel::bottom("at_input")
+            .frame(egui::Frame::none().inner_margin(egui::Margin { top: 6.0, ..Default::default() }))
+            .show_separator_line(false)
+            .show_inside(ui, |ui| self.netat_input(ui));
+        egui::CentralPanel::default().frame(egui::Frame::none()).show_inside(ui, |ui| {
+            egui::ScrollArea::vertical().id_salt("at_out").stick_to_bottom(true).auto_shrink(false).show(ui, |ui| {
                 ui.add(egui::TextEdit::multiline(&mut self.at_console.as_str()).code_editor().desired_width(f32::INFINITY));
             });
+        });
+    }
 
+    fn netat_input(&mut self, ui: &mut egui::Ui) {
         ui.horizontal(|ui| {
             let can_send = self.at_target.is_some() && !self.at_busy;
             let edit = ui.add_sized(
@@ -603,8 +618,21 @@ impl App {
     // ---------------- NETLOG tab ----------------
 
     fn netlog_tab(&mut self, ui: &mut egui::Ui) {
+        if self.nl_popout {
+            ui.add_space(8.0);
+            ui.label("NETLOG is open in its own window.");
+            if ui.button("Bring it back here").clicked() {
+                self.nl_popout = false;
+            }
+            return;
+        }
         ui.label("Device log over the vendor's NETLOG broadcast (UDP 64320). Stock firmware answers; \
                   this project's firmware has NETLOG off and shows its log on the web Debug page.");
+        self.netlog_view(ui);
+    }
+
+    /// NETLOG controls and log, in the tab or in the pop-out window.
+    fn netlog_view(&mut self, ui: &mut egui::Ui) {
         let streaming = self.nl_stream.is_some();
         ui.horizontal(|ui| {
             if ui.add_enabled(!self.nl_busy && !streaming && self.dev().is_some(), egui::Button::new("Scan")).clicked() {
@@ -629,7 +657,7 @@ impl App {
                 if ui.button("Stop").clicked() {
                     stop.store(true, Ordering::Relaxed);
                 }
-                ui.colored_label(egui::Color32::from_rgb(0x2e, 0xa0, 0x43), "live");
+                ui.colored_label(ok_color(ui), "live");
             } else if ui.add_enabled(self.nl_target.is_some(), egui::Button::new("Start")).clicked() {
                 let stop = Arc::new(AtomicBool::new(false));
                 self.nl_stream = Some(stop.clone());
@@ -647,9 +675,17 @@ impl App {
                     }
                 }
             }
+            let (label, hint) = if self.nl_popout {
+                ("Dock", "Put the log back in the NETLOG tab")
+            } else {
+                ("Pop out", "Open the log in its own window, to watch it while using the NETAT console")
+            };
+            if ui.button(label).on_hover_text(hint).clicked() {
+                self.nl_popout = !self.nl_popout;
+            }
         });
         ui.add_space(4.0);
-        egui::ScrollArea::vertical().id_salt("nl_out").stick_to_bottom(true).show(ui, |ui| {
+        egui::ScrollArea::vertical().id_salt("nl_out").stick_to_bottom(true).auto_shrink(false).show(ui, |ui| {
             ui.add(egui::TextEdit::multiline(&mut self.nl_text.as_str()).code_editor().desired_width(f32::INFINITY));
         });
     }
@@ -696,6 +732,21 @@ impl eframe::App for App {
                 ui.selectable_value(&mut self.tab, Tab::Netat, "NETAT console");
                 ui.selectable_value(&mut self.tab, Tab::Netlog, "NETLOG");
                 ui.selectable_value(&mut self.tab, Tab::About, "About");
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    // Reversed for the right-to-left layout: shows Light, Dark, System.
+                    let mut pref = ui.ctx().options(|o| o.theme_preference);
+                    let before = pref;
+                    for (p, name, hint) in [
+                        (egui::ThemePreference::System, "System", "Follow the operating system's light or dark setting"),
+                        (egui::ThemePreference::Dark, "Dark", "Dark theme"),
+                        (egui::ThemePreference::Light, "Light", "Light theme"),
+                    ] {
+                        ui.selectable_value(&mut pref, p, name).on_hover_text(hint);
+                    }
+                    if pref != before {
+                        ui.ctx().set_theme(pref);
+                    }
+                });
             });
             ui.add_space(2.0);
         });
@@ -714,6 +765,26 @@ impl eframe::App for App {
             Tab::Netlog => self.netlog_tab(ui),
             Tab::About => about_tab(ui),
         });
+
+        if self.nl_popout {
+            ctx.show_viewport_immediate(
+                egui::ViewportId::from_hash_of("netlog"),
+                egui::ViewportBuilder::default().with_title("NETLOG - Taixin toolbox").with_inner_size([760.0, 480.0]),
+                |ctx, class| {
+                    if class == egui::ViewportClass::Embedded {
+                        // The platform has no second window: show it as a floating panel instead.
+                        let mut open = true;
+                        egui::Window::new("NETLOG").open(&mut open).default_size([700.0, 400.0]).show(ctx, |ui| self.netlog_view(ui));
+                        self.nl_popout &= open;
+                    } else {
+                        egui::CentralPanel::default().show(ctx, |ui| self.netlog_view(ui));
+                        if ctx.input(|i| i.viewport().close_requested()) {
+                            self.nl_popout = false; // closing the window docks the log again
+                        }
+                    }
+                },
+            );
+        }
     }
 }
 
@@ -777,5 +848,12 @@ fn main() -> eframe::Result<()> {
         viewport: egui::ViewportBuilder::default().with_inner_size([860.0, 600.0]).with_title(format!("Taixin toolbox {}", env!("CARGO_PKG_VERSION"))),
         ..Default::default()
     };
-    eframe::run_native("Taixin toolbox", options, Box::new(|cc| Ok(Box::new(App::new(&cc.egui_ctx)))))
+    eframe::run_native(
+        "Taixin toolbox",
+        options,
+        Box::new(|cc| {
+            cc.egui_ctx.set_theme(egui::ThemePreference::System); // light or dark, as the OS is set
+            Ok(Box::new(App::new(&cc.egui_ctx)))
+        }),
+    )
 }

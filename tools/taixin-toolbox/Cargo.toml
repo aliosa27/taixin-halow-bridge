@@ -1,6 +1,6 @@
 [package]
 name = "taixin-toolbox"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 description = "Find, flash and debug Taixin TXW8301 HaLow bridges: Ethernet OTA, NETAT console, NETLOG viewer"
 license = "Apache-2.0"
